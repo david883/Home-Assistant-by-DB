@@ -19,13 +19,13 @@ blueprint:
   input:
     activity_sensors:
       name: Aktivitäts-Sensoren / Activity Sensors
-      description: "DE: Sensoren, die Anwesenheit anzeigen. / EN: Sensors indicating presence."
+      description: "DE: Sensoren, die Anwesenheit anzeigen (BWM, Kontakte, Schalter). / EN: Sensors indicating presence (Motion, Contacts, Switches)."
       selector:
         entity:
           multiple: true
     activity_states:
       name: Aktivitäts-Zustände / Activity States
-      description: "DE: Zustände, die als aktiv gelten. / EN: States considered active."
+      description: "DE: Zustände, die als aktiv gelten (z.B. on, motion, home). / EN: States considered active (e.g. on, motion, home)."
       default: ["on", "motion", "occupied"]
       selector:
         select:
@@ -38,12 +38,14 @@ blueprint:
             - "home"
     instant_absence_switches:
       name: Sofort-Abwesenheits-Schalter / Instant Absence Switches
+      description: "DE: Geräte, die ein sofortiges Verlassen einleiten (Taster, Schlösser). / EN: Devices that trigger instant departure (Buttons, Locks)."
       default: []
       selector:
         entity:
           multiple: true
     instant_absence_states:
       name: Zustände für Sofort-Abwesenheit / Instant Absence States
+      description: "DE: Auslösende Zustände der Sofort-Schalter (z.B. locked, on). / EN: Triggering states of the instant switches (e.g. locked, on)."
       default: ["on"]
       selector:
         select:
@@ -56,52 +58,61 @@ blueprint:
             - "locked"
     instant_absence_delay:
       name: Verzögerung Sofort-Abwesenheit / Instant Absence Delay
+      description: "DE: Zeitpuffer beim Verlassen des Hauses. / EN: Time buffer when leaving the house."
       default:
         minutes: 5
       selector:
         duration: {}
     presence_boolean:
       name: Anwesenheits-Status / Presence Status
+      description: "DE: Der zentrale Input-Boolean für den Status. / EN: The central input boolean for the presence status."
       selector:
         entity:
           filter:
             domain: input_boolean
     master_switch_presence:
       name: "Master: Anwesenheit / Master: Presence"
+      description: "DE: Erlaubt automatisches Setzen auf 'Anwesend'. / EN: Allows automatic setting to 'Present'."
       selector:
         entity:
           filter:
             domain: input_boolean
     master_switch_absence:
       name: "Master: Abwesenheit / Master: Absence"
+      description: "DE: Erlaubt automatisches Setzen auf 'Abwesend'. / EN: Allows automatic setting to 'Absent'."
       selector:
         entity:
           filter:
             domain: input_boolean
     absence_delay:
       name: Wartezeit Abwesenheit / Absence Delay
+      description: "DE: Zeit ohne Aktivität bis zur Abwesenheits-Meldung. / EN: Time without activity until absence notification."
       default:
         hours: 2
       selector:
         duration: {}
     absence_forbidden_start:
       name: Sperre Beginn / Night Lock Start
+      description: "DE: Ab dieser Uhrzeit wird nicht auf abwesend geschaltet. / EN: Absence will not be triggered after this time."
       default: "22:00:00"
       selector:
         time: {}
     absence_forbidden_end:
       name: Sperre Ende / Night Lock End
+      description: "DE: Ab dieser Uhrzeit ist die Sperre wieder aufgehoben. / EN: Night lock ends at this time."
       default: "08:00:00"
       selector:
         time: {}
     presence_counter:
       name: Aktivitäts-Counter / Activity Counter
+      description: "DE: Counter-Helfer zum Filtern von Störungen. / EN: Counter helper to filter triggers."
       selector:
         entity:
           filter:
             domain: counter
     counter_threshold:
       name: Schwellenwert / Threshold
+      description: "DE: Anzahl der Impulse für Status 'Anwesend'. / EN: Number of triggers needed for 'Present' status."
       default: 2
       selector:
         number:
@@ -110,6 +121,7 @@ blueprint:
           mode: box
     counter_reset_timeout:
       name: Counter Reset Timeout
+      description: "DE: Zeitfenster (Minuten) für den Zähler-Reset. / EN: Time window (minutes) for the counter reset."
       default: 5
       selector:
         number:
@@ -119,23 +131,25 @@ blueprint:
           mode: slider
     absence_actions:
       name: Aktionen Abwesenheit / Absence Actions
+      description: "DE: Aktionen beim Verlassen (z.B. Licht aus). / EN: Actions when leaving (e.g. lights off)."
       default: []
       selector:
         action: {}
     presence_actions:
       name: Aktionen Anwesenheit / Presence Actions
+      description: "DE: Aktionen beim Ankommen (z.B. Begrüßung). / EN: Actions when arriving (e.g. greeting)."
       default: []
       selector:
         action: {}
 
 mode: restart
 
-# Hier definieren wir die Variablen für die Templates, um den !input Fehler zu umgehen
+# Fehler-Fix: !input Werte in Variablen speichern, damit sie im Template funktionieren
 variables:
   sensors: !input activity_sensors
   states_list: !input activity_states
   delay_config: !input absence_delay
-  threshold: !input counter_threshold
+  threshold_val: !input counter_threshold
   counter_entity: !input presence_counter
 
 trigger:
@@ -199,7 +213,7 @@ action:
           - choose: []
             default: !input absence_actions
 
-      # FALL 3: Anwesenheit setzen
+      # FALL 3: Anwesenheit setzen (Kommen)
       - conditions:
           - condition: trigger
             id: "aktivitaet_erkannt"
@@ -216,7 +230,7 @@ action:
           - if:
               - condition: template
                 value_template: >
-                  {{ states(counter_entity) | int >= (threshold | int) }}
+                  {{ states(counter_entity) | int >= (threshold_val | int) }}
             then:
               - action: input_boolean.turn_on
                 target:
