@@ -1,7 +1,7 @@
 blueprint:
   name: "Anwesenheits-Steuerung DB"
   description: >
-    ### Version 1.2.2
+    ### Version 1.2.3
     **Autor: D.B.**
     
     [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
@@ -119,3 +119,42 @@ blueprint:
           min: 1
           max: 10
           mode: box
+    counter_reset_timeout:
+      name: "Counter Reset Timeout"
+      description: "DE: Zeitfenster (Minuten) für den Zähler-Reset. / EN: Time window (minutes) for the counter reset."
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: "min"
+          mode: slider
+    absence_actions:
+      name: "Aktionen Abwesenheit / Absence Actions"
+      description: "DE: Aktionen beim Verlassen (z.B. Licht aus). / EN: Actions when leaving (e.g. lights off)."
+      default: []
+      selector:
+        action: {}
+    presence_actions:
+      name: "Aktionen Anwesenheit / Presence Actions"
+      description: "DE: Aktionen beim Ankommen (z.B. Begrüßung). / EN: Actions when arriving (e.g. greeting)."
+      default: []
+      selector:
+        action: {}
+
+mode: restart
+
+variables:
+  sensors: !input activity_sensors
+  states_list: !input activity_states
+  delay_config: !input absence_delay
+  threshold_val: !input counter_threshold
+  counter_entity: !input presence_counter
+
+trigger:
+  - platform: state
+    entity_id: !input activity_sensors
+    id: "potential_absence"
+  - platform: state
+    entity_id: !input activity_sensors
+    to: !input activity_states
