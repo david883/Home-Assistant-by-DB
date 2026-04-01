@@ -1,0 +1,243 @@
+blueprint:
+  name: "Anwesenheits-Steuerung DB"
+  description: >
+    ### Version 1.0
+    **Autor: D.B.**
+    
+    [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
+
+
+    Umfassende Logik zur Steuerung des Anwesenheitsstatus mit Aktivitätsprüfung, Nacht-Sperre und verzögerter Sofort-Abwesenheit.
+  domain: automation
+  input:
+    activity_sensors:
+      name: Aktivitäts-Sensoren / Schalter
+      description: "Wähle hier alle Geräte aus, die anzeigen, dass jemand zu Hause ist (z.B. Bewegungsmelder, Türkontakte, Lichtschalter oder smarte Steckdosen). Sobald eines dieser Geräte einen der unten definierten 'Aktivitäts-Zustände' einnimmt, wird dies vom Script registriert."
+      selector:
+        entity:
+          multiple: true
+    activity_states:
+      name: Aktivitäts-Zustände
+      description: "Gib hier an, welche Status-Werte der oben gewählten Sensoren als 'aktiv' gelten sollen. Standardmäßig sind dies 'on' (für Schalter/BWM), 'motion' (für Kameras) oder 'occupied' (für Präsenzmelder). Du kannst auch eigene Werte wie 'home' oder 'playing' hinzufügen."
+      default: ["on", "motion", "occupied"]
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          options:
+            - "on"
+            - "motion"
+            - "occupied"
+            - "home"
+    instant_absence_switches:
+      name: Sofort-Abwesenheits-Schalter
+      description: "Diese Geräte lösen eine sofortige (bzw. nur kurz verzögerte) Abwesenheit aus. Typische Beispiele sind ein 'Alles Aus'-Taster an der Haustür, ein smartes Türschloss oder ein virtueller Schalter in der App, den du beim Verlassen betätigst."
+      default: []
+      selector:
+        entity:
+          multiple: true
+    instant_absence_states:
+      name: Zustände für Sofort-Abwesenheit
+      description: "Definiere, bei welchem Zustand der 'Sofort-Abwesenheits-Schalter' die Logik auslösen soll. Wenn du ein Türschloss überwachst, wäre dies 'locked', bei einem Taster meist 'on' oder 'pressed'."
+      default: ["on"]
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          options:
+            - "on"
+            - "off"
+            - "pressed"
+            - "locked"
+    instant_absence_delay:
+      name: Verzögerung für Sofort-Abwesenheit
+      description: "Zeitpuffer nach Betätigung des Sofort-Abwesenheits-Schalters. Dies gibt dir Zeit, das Haus zu verlassen, bevor der Status auf 'Abwesend' springt und z.B. das Licht ausschaltet oder die Alarmanlage aktiviert. Default: 5 Minuten."
+      default:
+        minutes: 5
+      selector:
+        duration: {}
+    presence_boolean:
+      name: Anwesenheits-Status (Helfer)
+      description: "Wähle den 'Input Boolean' (Helfer), der deinen Anwesenheitszustand repräsentiert. Dieser Schalter wird vom Script automatisch auf AN gesetzt, wenn du kommst, und auf AUS, wenn du gehst."
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
+    master_switch_presence:
+      name: "Automatik: Anwesenheit setzen"
+      description: "Ein Hauptschalter (Input Boolean), der bestimmt, ob die Automatik dich überhaupt auf 'Anwesend' setzen darf. Ist dieser Schalter AUS, bleibst du im System 'Abwesend', egal wie viel Bewegung im Haus ist."
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
+    master_switch_absence:
+      name: "Automatik: Abwesenheit setzen"
+      description: "Ein Hauptschalter, der die automatische Erkennung von Abwesenheit erlaubt. Wenn du Gäste ohne Handy hast, kannst du diesen Schalter deaktivieren, damit das Haus nicht versehentlich auf 'Abwesend' schaltet, während sie noch da sind."
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
+    absence_delay:
+      name: Wartezeit bis Abwesenheit (Normal)
+      description: "Die Zeitspanne, die vergehen muss, ohne dass IRGENDEIN Aktivitäts-Sensor ausgelöst wurde, bevor das System auf 'Abwesend' schaltet. Dies verhindert ein Ausschalten, wenn man mal 1 Stunde still auf dem Sofa sitzt. Default: 2 Stunden."
+      default:
+        hours: 2
+      selector:
+        duration: {}
+    absence_forbidden_start:
+      name: Abwesenheits-Sperre Beginn
+      description: "Ab dieser Uhrzeit (z.B. 22:00 Uhr) ist es dem Script untersagt, den Status auf 'Abwesend' zu setzen. Dies schützt dich davor, dass das System nachts während des Schlafs auf 'Abwesend' schaltet."
+      default: "22:00:00"
+      selector:
+        time: {}
+    absence_forbidden_end:
+      name: Abwesenheits-Sperre Ende
+      description: "Bis zu dieser Uhrzeit (z.B. 08:00 Uhr) bleibt die Abwesenheits-Sperre aktiv. Erst nach dieser Zeit kann die Automatik wieder auf 'Abwesend' schalten, wenn keine Bewegung registriert wurde."
+      default: "08:00:00"
+      selector:
+        time: {}
+    presence_counter:
+      name: Aktivitäts-Counter
+      description: "Wähle einen 'Counter' Helfer. Dieser zählt die Aktivitäts-Impulse, bevor auf 'Anwesend' geschaltet wird. Dies dient als Filter gegen Fehl-Auslösungen (z.B. durch Haustiere)."
+      selector:
+        entity:
+          filter:
+            domain: counter
+    counter_threshold:
+      name: Counter Schwellenwert
+      description: "Wie viele Aktivitäts-Impulse (Bewegungen/Schaltungen) innerhalb kurzer Zeit nötig sind, um dich als 'Anwesend' zu markieren. Ein Wert von 2 oder 3 ist ideal, um kleine Störungen zu ignorieren."
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 10
+          mode: box
+    counter_reset_timeout:
+      name: Counter Reset Timeout (Minuten)
+      description: "Zeitfenster für den Zähler: Wenn du den Schwellenwert auf 3 stellst, müssen diese 3 Impulse innerhalb dieser Minuten-Anzahl erfolgen. Danach wird der Zähler wieder auf 0 gesetzt."
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: "min"
+          mode: slider
+    absence_actions:
+      name: Aktionen bei Abwesenheit
+      description: "Hier definierst du alles, was passieren soll, wenn das Haus leer ist: Lichter aus, Heizung runter, Staubsauger an, Alexa 'Tschüss' sagen lassen, etc."
+      default: []
+      selector:
+        action: {}
+    presence_actions:
+      name: Aktionen bei Anwesenheit
+      description: "Hier definierst du die Willkommens-Szenarien: Alexa Begrüßung, Flurlicht an, Kaffeemaschine vorheizen, etc."
+      default: []
+      selector:
+        action: {}
+
+mode: restart
+
+trigger:
+  - platform: state
+    entity_id: !input activity_sensors
+    id: "potential_absence"
+  - platform: state
+    entity_id: !input activity_sensors
+    to: !input activity_states
+    id: "aktivitaet_erkannt"
+  - platform: state
+    entity_id: !input instant_absence_switches
+    to: !input instant_absence_states
+    id: "sofort_abwesend_trigger"
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "sofort_abwesend_trigger"
+        sequence:
+          - delay: !input instant_absence_delay
+          - action: input_boolean.turn_off
+            target:
+              entity_id: !input presence_boolean
+          - action: counter.reset
+            target:
+              entity_id: !input presence_counter
+          - choose: []
+            default: !input absence_actions
+
+      - conditions:
+          - condition: trigger
+            id: "potential_absence"
+          - condition: state
+            entity_id: !input master_switch_absence
+            state: "on"
+          - condition: state
+            entity_id: !input presence_boolean
+            state: "on"
+          - condition: template
+            value_template: >
+              {% set sensors = !input activity_sensors %}
+              {% set active_states = !input activity_states %}
+              {% set delay = !input absence_delay %}
+              {% set inactive = expand(sensors) | selectattr('state', 'in', active_states) | list | count == 0 %}
+              {% set last_ch = expand(sensors) | map(attribute='last_changed') | max %}
+              {% set time_ok = (now() - last_ch).total_seconds() >= (delay.hours * 3600 + delay.minutes * 60 + delay.seconds) %}
+              {{ inactive and time_ok }}
+          - condition: not
+            conditions:
+              - condition: time
+                after: !input absence_forbidden_start
+                before: !input absence_forbidden_end
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: !input presence_boolean
+          - action: counter.reset
+            target:
+              entity_id: !input presence_counter
+          - choose: []
+            default: !input absence_actions
+
+      - conditions:
+          - condition: trigger
+            id: "aktivitaet_erkannt"
+          - condition: state
+            entity_id: !input master_switch_presence
+            state: "on"
+          - condition: state
+            entity_id: !input presence_boolean
+            state: "off"
+        sequence:
+          - action: counter.increment
+            target:
+              entity_id: !input presence_counter
+          - if:
+              - condition: template
+                value_template: >
+                  {{ states(!input presence_counter) | int >= (!input counter_threshold) | int }}
+            then:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: !input presence_boolean
+              - choose: []
+                default: !input presence_actions
+              - action: counter.reset
+                target:
+                  entity_id: !input presence_counter
+            else:
+              - wait_for_trigger:
+                  - platform: state
+                    entity_id: !input activity_sensors
+                    to: !input activity_states
+                timeout:
+                  minutes: !input counter_reset_timeout
+                continue_on_timeout: true
+              - if:
+                  - condition: template
+                    value_template: "{{ wait.trigger == none }}"
+                then:
+                  - action: counter.reset
+                    target:
+                      entity_id: !input presence_counter
+                      
