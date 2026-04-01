@@ -1,7 +1,7 @@
 blueprint:
   name: "Anwesenheits-Steuerung DB"
   description: >
-    ### Version 1.2.6
+    ### Version 1.2.7
     **Autor: D.B.**
     
     [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
@@ -117,3 +117,18 @@ blueprint:
           mode: box
     counter_reset_timeout:
       name: "Counter Reset Timeout"
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: "min"
+          mode: slider
+    absence_actions:
+      name: "Aktionen Abwesenheit / Absence Actions"
+      default: []
+      selector:
+        action: {}
+    presence_actions:
+      name: "Aktionen Anwesenheit / Presence Actions"
+      default: []
