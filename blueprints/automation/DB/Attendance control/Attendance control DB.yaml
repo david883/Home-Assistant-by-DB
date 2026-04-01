@@ -132,3 +132,115 @@ blueprint:
     presence_actions:
       name: "Aktionen Anwesenheit / Presence Actions"
       default: []
+      selector:
+        action: {}
+
+mode: restart
+
+variables:
+  sensors: !input activity_sensors
+  states_list: !input activity_states
+  delay_config: !input absence_delay
+  threshold_val: !input counter_threshold
+  counter_entity: !input presence_counter
+
+trigger:
+  - platform: state
+    entity_id: !input activity_sensors
+    id: "potential_absence"
+  - platform: state
+    entity_id: !input activity_sensors
+    to: !input activity_states
+    id: "aktivitaet_erkannt"
+  - platform: state
+    entity_id: !input instant_absence_switches
+    to: !input instant_absence_states
+    id: "sofort_abwesend_trigger"
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "sofort_abwesend_trigger"
+        sequence:
+          - delay: !input instant_absence_delay
+          - action: input_boolean.turn_off
+            target:
+              entity_id: !input presence_boolean
+          - action: counter.reset
+            target:
+              entity_id: !input presence_counter
+          - choose: []
+            default: !input absence_actions
+
+      - conditions:
+          - condition: trigger
+            id: "potential_absence"
+          - condition: state
+            entity_id: !input master_switch_absence
+            state: "on"
+          - condition: state
+            entity_id: !input presence_boolean
+            state: "on"
+          - condition: template
+            value_template: >
+              {% set inactive = expand(sensors) | selectattr('state', 'in', states_list) | list | count == 0 %}
+              {% set last_ch = expand(sensors) | map(attribute='last_changed') | max %}
+              {% set wait_time = (delay_config.hours | int * 3600) + (delay_config.minutes | int * 60) + (delay_config.seconds | int) %}
+              {% set time_diff = (now() - last_ch).total_seconds() %}
+              {{ inactive and (time_diff >= wait_time) }}
+          - condition: not
+            conditions:
+              - condition: time
+                after: !input absence_forbidden_start
+                before: !input absence_forbidden_end
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: !input presence_boolean
+          - action: counter.reset
+            target:
+              entity_id: !input presence_counter
+          - choose: []
+            default: !input absence_actions
+
+      - conditions:
+          - condition: trigger
+            id: "aktivitaet_erkannt"
+          - condition: state
+            entity_id: !input master_switch_presence
+            state: "on"
+          - condition: state
+            entity_id: !input presence_boolean
+            state: "off"
+        sequence:
+          - action: counter.increment
+            target:
+              entity_id: !input presence_counter
+          - if:
+              - condition: template
+                value_template: "{{ states(counter_entity) | int >= (threshold_val | int) }}"
+            then:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: !input presence_boolean
+              - choose: []
+                default: !input presence_actions
+              - action: counter.reset
+                target:
+                  entity_id: !input presence_counter
+            else:
+              - wait_for_trigger:
+                  - platform: state
+                    entity_id: !input activity_sensors
+                    to: !input activity_states
+                timeout:
+                  minutes: !input counter_reset_timeout
+                continue_on_timeout: true
+              - if:
+                  - condition: template
+                    value_template: "{{ wait.trigger == none }}"
+                then:
+                  - action: counter.reset
+                    target:
+                      entity_id: !input presence_counter
