@@ -1,16 +1,18 @@
 # Anwesenheits-Steuerung DB / Attendance Control DB
 
-<div align="center">
-<p><strong>Version 1.2</strong> | <strong>Autor: D.B.</strong></p>
+<p align="center">
+  <strong>Version 1.2</strong> | <strong>Autor: D.B.</strong>
+</p>
 
-<a href="[https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)" target="_blank">
-<img src="[https://img.shields.io/badge/Donate-PayPal-blue.svg](https://img.shields.io/badge/Donate-PayPal-blue.svg)" alt="PayPal">
-</a>
-&nbsp;&nbsp;
-<a href="[https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FAttendance%2520control%2FAttendance%2520control%2520DB.yaml](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FAttendance%2520control%2FAttendance%2520control%2520DB.yaml)" target="_blank">
-<img src="[https://my.home-assistant.io/badges/blueprint_import.svg](https://my.home-assistant.io/badges/blueprint_import.svg)" alt="Import Blueprint">
-</a>
-</div>
+<p align="center">
+  <a href="https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN">
+    <img src="https://img.shields.io/badge/Donate-PayPal-blue.svg" alt="PayPal">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FAttendance%2520control%2FAttendance%2520control%2520DB.yaml">
+    <img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import Blueprint">
+  </a>
+</p>
 
 ---
 
@@ -38,9 +40,9 @@ This Home Assistant automation (blueprint) provides an intelligent and highly fl
 
 ---
 
-<div align="center">
-<p>If you like this blueprint, feel free to support my work!</p>
-<a href="[https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)" target="_blank">
-<img src="[https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)" alt="PayPal Donate">
-</a>
-</div>
+<p align="center">
+  If you like this blueprint, feel free to support my work!<br>
+  <a href="https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN">
+    <img src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="PayPal Donate">
+  </a>
+</p>
