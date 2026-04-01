@@ -1,7 +1,7 @@
 blueprint:
   name: "Anwesenheits-Steuerung DB"
   description: >
-    ### Version 1.2.3
+    ### Version 1.2.4
     **Autor: D.B.**
     
     [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
@@ -158,3 +158,39 @@ trigger:
   - platform: state
     entity_id: !input activity_sensors
     to: !input activity_states
+    id: "aktivitaet_erkannt"
+  - platform: state
+    entity_id: !input instant_absence_switches
+    to: !input instant_absence_states
+    id: "sofort_abwesend_trigger"
+
+action:
+  - choose:
+      # FALL 1: Sofortige Abwesenheit
+      - conditions:
+          - condition: trigger
+            id: "sofort_abwesend_trigger"
+        sequence:
+          - delay: !input instant_absence_delay
+          - action: input_boolean.turn_off
+            target:
+              entity_id: !input presence_boolean
+          - action: counter.reset
+            target:
+              entity_id: !input presence_counter
+          - choose: []
+            default: !input absence_actions
+
+      # FALL 2: Automatische Abwesenheit
+      - conditions:
+          - condition: trigger
+            id: "potential_absence"
+          - condition: state
+            entity_id: !input master_switch_absence
+            state: "on"
+          - condition: state
+            entity_id: !input presence_boolean
+            state: "on"
+          - condition: template
+            value_template: >
+              {% set inactive = expand(
