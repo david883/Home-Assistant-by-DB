@@ -1,7 +1,7 @@
 blueprint:
   name: "Anwesenheits-Steuerung DB"
   description: >
-    ### Version 1.3.8
+    ### Version 1.3.9
     **Autor: D.B.**
 
     DE: Umfassende Logik zur Steuerung des Anwesenheitsstatus ohne Nacht-Sperre.
@@ -151,7 +151,7 @@ trigger:
 
 action:
   - choose:
-      # --- LOGIK: ABWESEND WERDEN ---
+      # --- LOGIK: ABWESEND ---
       - conditions:
           - condition: state
             entity_id: !input presence_boolean
@@ -161,13 +161,17 @@ action:
             state: "on"
           - condition: template
             value_template: >
-              {# Sind alle Sensoren im Inaktiv-Status? #}
+              {# Check Sensoren #}
               {% set active_count = expand(var_sensors) | selectattr('state', 'in', var_states_active) | list | count %}
               {% set is_inactive = active_count == 0 %}
 
-              {# Zeitprüfung #}
+              {# Zeitprüfung - Sicherer Zugriff auf Duration-Keys #}
               {% set last_changed = expand(var_sensors) | map(attribute='last_changed') | max %}
-              {% set wait_sec = (var_delay.hours * 3600) + (var_delay.minutes * 60) + (var_delay.seconds) %}
+              {% set h = var_delay.hours | default(0) | int %}
+              {% set m = var_delay.minutes | default(0) | int %}
+              {% set s = var_delay.seconds | default(0) | int %}
+              {% set wait_sec = (h * 3600) + (m * 60) + s %}
+              
               {% set time_ok = (as_timestamp(now()) - as_timestamp(last_changed)) >= (wait_sec - 2) %}
 
               {{ is_inactive and time_ok }}
@@ -181,7 +185,7 @@ action:
           - choose: []
             default: !input absence_actions
 
-      # --- LOGIK: ANWESEND WERDEN ---
+      # --- LOGIK: ANWESEND ---
       - conditions:
           - condition: state
             entity_id: !input presence_boolean
