@@ -1,12 +1,12 @@
 blueprint:
   name: "Anwesenheits-Steuerung DB"
   description: >
-    ### Version 1.4.1
+    ### Version 1.4.2
     **Autor: D.B.**
 
-    DE: Logik mit verzögertem Sofort-Aus und Nachtsperre über Helfer.
+    DE: Umfassende Logik mit Inaktiv-Zuständen, Counter-Reset und Nachtsperre über Helfer.
     
-    EN: Logic with delayed instant-off and night lock via helpers.
+    EN: Comprehensive logic with inactive states, counter reset and night lock via helpers.
   domain: automation
   input:
     activity_sensors:
@@ -17,13 +17,22 @@ blueprint:
           multiple: true
     activity_states:
       name: "Zustände Aktiv / Active States"
-      description: "DE: Zustände für ANWESEND.\n\nEN: States for PRESENT."
+      description: "DE: Zustände für ANWESEND (z.B. on).\n\nEN: States for PRESENT (e.g. on)."
       default: ["on", "motion", "occupied"]
       selector:
         select:
           multiple: true
           custom_value: true
           options: ["on", "motion", "occupied", "home"]
+    inactive_states:
+      name: "Zustände Inaktiv / Inactive States"
+      description: "DE: Zustände für ABWESEND (z.B. off).\n\nEN: States for ABSENT (e.g. off)."
+      default: ["off", "closed", "unavailable"]
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          options: ["off", "closed", "unavailable", "not_home"]
     presence_boolean:
       name: "Anwesenheits Status / Presence Status"
       description: "DE: Der zentrale Status-Schalter.\n\nEN: The central status switch."
@@ -82,17 +91,28 @@ blueprint:
             domain: input_datetime
     presence_counter:
       name: "Aktivitäts Counter / Activity Counter"
+      description: "DE: Counter-Helfer auswählen.\n\nEN: Select counter helper."
       selector:
         entity:
           filter:
             domain: counter
     counter_threshold:
       name: "Schwellenwert / Threshold"
+      description: "DE: Impulse für Anwesenheit.\n\nEN: Triggers for presence."
       default: 2
       selector:
         number:
           min: 1
           max: 10
+    counter_reset_timeout:
+      name: "Zeitfenster für Impulse / Counter Reset Timeout"
+      description: "DE: Innerhalb wie vieler Minuten müssen die Impulse erfolgen?\n\nEN: Triggers must occur within this many minutes."
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: "min"
     absence_actions:
       name: "Aktionen Abwesenheit / Absence Actions"
       default: []
@@ -110,9 +130,9 @@ variables:
   var_sensors: !input activity_sensors
   var_states_active: !input activity_states
   var_delay: !input absence_delay
-  var_manual_delay: !input manual_absence_delay
   var_counter: !input presence_counter
   var_threshold: !input counter_threshold
+  var_reset_time: !input counter_reset_timeout
   var_lock_start_ent: !input night_lock_start_helper
   var_lock_end_ent: !input night_lock_end_helper
 
@@ -127,7 +147,7 @@ trigger:
 
 action:
   - choose:
-      # --- FALL 1: SOFORT ABWESEND (Mit eigener Verzögerung) ---
+      # --- FALL 1: SOFORT ABWESEND ---
       - conditions:
           - condition: state
             entity_id: !input manual_absence_switch
@@ -184,7 +204,7 @@ action:
           - choose: []
             default: !input absence_actions
 
-      # --- FALL 3: ANWESEND WERDEN ---
+      # --- FALL 3: ANWESEND WERDEN (Mit Counter & Timeout) ---
       - conditions:
           - condition: state
             entity_id: !input presence_boolean
@@ -211,3 +231,18 @@ action:
                   entity_id: !input presence_counter
               - choose: []
                 default: !input presence_actions
+            else:
+              # Warte auf weiteren Impuls oder Timeout
+              - wait_for_trigger:
+                  - platform: state
+                    entity_id: !input activity_sensors
+                timeout:
+                  minutes: !input counter_reset_timeout
+                continue_on_timeout: true
+              - if:
+                  - condition: template
+                    value_template: "{{ wait.trigger == none }}"
+                then:
+                  - action: counter.reset
+                    target:
+                      entity_id: !input presence_counter
