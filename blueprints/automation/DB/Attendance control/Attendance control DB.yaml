@@ -1,12 +1,12 @@
 blueprint:
   name: "Anwesenheits-Steuerung DB"
   description: >
-    ### Version 1.3.6
+    ### Version 1.3.8
     **Autor: D.B.**
 
-    DE: Umfassende Logik zur Steuerung des Anwesenheitsstatus.
+    DE: Umfassende Logik zur Steuerung des Anwesenheitsstatus ohne Nacht-Sperre.
     
-    EN: Comprehensive presence control logic.
+    EN: Comprehensive presence control logic without night lock.
   domain: automation
   input:
     activity_sensors:
@@ -21,9 +21,9 @@ blueprint:
     activity_states:
       name: "Zustände Aktiv / Active States"
       description: >
-        DE: Zustände, die als aktiv gelten (z.B. on, motion).
+        DE: Zustände für ANWESEND (z.B. on, motion).
         
-        EN: States considered active (e.g. on, motion).
+        EN: States for PRESENT (e.g. on, motion).
       default: ["on", "motion", "occupied"]
       selector:
         select:
@@ -33,9 +33,9 @@ blueprint:
     inactive_states:
       name: "Zustände Inaktiv / Inactive States"
       description: >
-        DE: Zustände, die als inaktiv gelten (z.B. off, closed).
+        DE: Zustände für ABWESEND (z.B. off, closed).
         
-        EN: States considered inactive (e.g. off, closed).
+        EN: States for ABSENT (e.g. off, closed).
       default: ["off", "closed", "unavailable"]
       selector:
         select:
@@ -82,24 +82,6 @@ blueprint:
         minutes: 1
       selector:
         duration: {}
-    absence_forbidden_start:
-      name: "Sperre Beginn / Night Lock Start"
-      description: >
-        DE: Ab dieser Uhrzeit wird nicht auf abwesend geschaltet.
-        
-        EN: Absence will not be triggered after this time.
-      default: "22:00:00"
-      selector:
-        time: {}
-    absence_forbidden_end:
-      name: "Sperre Ende / Night Lock End"
-      description: >
-        DE: Ab dieser Uhrzeit ist die Sperre wieder aufgehoben.
-        
-        EN: Night lock ends at this time.
-      default: "08:00:00"
-      selector:
-        time: {}
     presence_counter:
       name: "Aktivitäts Counter / Activity Counter"
       description: >
@@ -157,10 +139,7 @@ mode: restart
 variables:
   var_sensors: !input activity_sensors
   var_states_active: !input activity_states
-  var_states_inactive: !input activity_states
   var_delay: !input absence_delay
-  var_start: !input absence_forbidden_start
-  var_end: !input absence_forbidden_end
   var_counter: !input presence_counter
   var_threshold: !input counter_threshold
 
@@ -172,13 +151,13 @@ trigger:
 
 action:
   - choose:
-      # --- LOGIK: ABWESEND ---
+      # --- LOGIK: ABWESEND WERDEN ---
       - conditions:
           - condition: state
-            entity_id: !input master_switch_absence
+            entity_id: !input presence_boolean
             state: "on"
           - condition: state
-            entity_id: !input presence_boolean
+            entity_id: !input master_switch_absence
             state: "on"
           - condition: template
             value_template: >
@@ -189,17 +168,9 @@ action:
               {# Zeitprüfung #}
               {% set last_changed = expand(var_sensors) | map(attribute='last_changed') | max %}
               {% set wait_sec = (var_delay.hours * 3600) + (var_delay.minutes * 60) + (var_delay.seconds) %}
-              {% set time_ok = (as_timestamp(now()) - as_timestamp(last_changed)) >= wait_sec %}
+              {% set time_ok = (as_timestamp(now()) - as_timestamp(last_changed)) >= (wait_sec - 2) %}
 
-              {# Nachtsperre #}
-              {% set cur = now().strftime('%H:%M:%S') %}
-              {% if var_start < var_end %}
-                {% set locked = var_start <= cur <= var_end %}
-              {% else %}
-                {% set locked = cur >= var_start or cur <= var_end %}
-              {% endif %}
-
-              {{ is_inactive and time_ok and not locked }}
+              {{ is_inactive and time_ok }}
         sequence:
           - action: input_boolean.turn_off
             target:
@@ -210,14 +181,14 @@ action:
           - choose: []
             default: !input absence_actions
 
-      # --- LOGIK: ANWESEND ---
+      # --- LOGIK: ANWESEND WERDEN ---
       - conditions:
-          - condition: state
-            entity_id: !input master_switch_presence
-            state: "on"
           - condition: state
             entity_id: !input presence_boolean
             state: "off"
+          - condition: state
+            entity_id: !input master_switch_presence
+            state: "on"
           - condition: template
             value_template: >
               {{ expand(var_sensors) | selectattr('state', 'in', var_states_active) | list | count > 0 }}
@@ -232,8 +203,8 @@ action:
               - action: input_boolean.turn_on
                 target:
                   entity_id: !input presence_boolean
-              - choose: []
-                default: !input presence_actions
               - action: counter.reset
                 target:
                   entity_id: !input presence_counter
+              - choose: []
+                default: !input presence_actions
