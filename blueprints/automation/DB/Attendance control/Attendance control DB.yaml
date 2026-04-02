@@ -1,12 +1,12 @@
 blueprint:
   name: "Anwesenheits-Steuerung DB"
   description: >
-    ### Version 1.4.0
+    ### Version 1.4.1
     **Autor: D.B.**
 
-    DE: Umfassende Logik mit Sofort-Aus-Schalter und Nachtruhe über Helfer.
+    DE: Logik mit verzögertem Sofort-Aus und Nachtsperre über Helfer.
     
-    EN: Comprehensive logic with instant-off switch and night lock via helpers.
+    EN: Logic with delayed instant-off and night lock via helpers.
   domain: automation
   input:
     activity_sensors:
@@ -47,28 +47,35 @@ blueprint:
             domain: input_boolean
     manual_absence_switch:
       name: "Sofort-Abwesend Schalter / Instant Absence Switch"
-      description: "DE: Ein Helfer, der bei Aktivierung sofort auf abwesend schaltet.\n\nEN: A helper that triggers absence immediately."
+      description: "DE: Schaltet bei Aktivierung (ggf. verzögert) auf abwesend.\n\nEN: Triggers absence (optional delay) when activated."
       selector:
         entity:
           filter:
             domain: input_boolean
+    manual_absence_delay:
+      name: "Verzögerung für Sofort-Schalter / Delay for Instant Switch"
+      description: "DE: Zeit, die nach Drücken des Sofort-Schalters gewartet wird.\n\nEN: Delay after pressing the instant switch."
+      default:
+        seconds: 0
+      selector:
+        duration: {}
     absence_delay:
       name: "Wartezeit Abwesenheit / Absence Delay"
-      description: "DE: Verzögerung für die Automatik.\n\nEN: Delay for the automation."
+      description: "DE: Normale Verzögerung für die Automatik.\n\nEN: Standard delay for automation."
       default:
         minutes: 1
       selector:
         duration: {}
     night_lock_start_helper:
-      name: "Sperre Beginn (Helfer) / Lock Start (Helper)"
-      description: "DE: Input_datetime Helfer für den Start der Sperre.\n\nEN: Input_datetime helper for lock start."
+      name: "Nachtsperre beginnt um / Night lock starts at"
+      description: "DE: Helfer für den Start der Sperre.\n\nEN: Helper for lock start."
       selector:
         entity:
           filter:
             domain: input_datetime
     night_lock_end_helper:
-      name: "Sperre Ende (Helfer) / Lock End (Helper)"
-      description: "DE: Input_datetime Helfer für das Ende der Sperre.\n\nEN: Input_datetime helper for lock end."
+      name: "Nachtsperre endet um / Night lock ends at"
+      description: "DE: Helfer für das Ende der Sperre.\n\nEN: Helper for lock end."
       selector:
         entity:
           filter:
@@ -103,6 +110,7 @@ variables:
   var_sensors: !input activity_sensors
   var_states_active: !input activity_states
   var_delay: !input absence_delay
+  var_manual_delay: !input manual_absence_delay
   var_counter: !input presence_counter
   var_threshold: !input counter_threshold
   var_lock_start_ent: !input night_lock_start_helper
@@ -119,12 +127,13 @@ trigger:
 
 action:
   - choose:
-      # --- FALL 1: SOFORT ABWESEND (Manueller Schalter) ---
+      # --- FALL 1: SOFORT ABWESEND (Mit eigener Verzögerung) ---
       - conditions:
           - condition: state
             entity_id: !input manual_absence_switch
             state: "on"
         sequence:
+          - delay: !input manual_absence_delay
           - action: input_boolean.turn_off
             target:
               entity_id: !input presence_boolean
@@ -137,7 +146,7 @@ action:
           - choose: []
             default: !input absence_actions
 
-      # --- FALL 2: AUTOMATISCH ABWESEND (Mit Verzögerung & Nachtsperre) ---
+      # --- FALL 2: AUTOMATISCH ABWESEND ---
       - conditions:
           - condition: state
             entity_id: !input presence_boolean
@@ -147,10 +156,7 @@ action:
             state: "on"
           - condition: template
             value_template: >
-              {# Sensoren checken #}
               {% set active_count = expand(var_sensors) | selectattr('state', 'in', var_states_active) | list | count %}
-              
-              {# Zeitprüfung #}
               {% set last_changed = expand(var_sensors) | map(attribute='last_changed') | max %}
               {% set h = var_delay.hours | default(0) | int %}
               {% set m = var_delay.minutes | default(0) | int %}
@@ -158,7 +164,6 @@ action:
               {% set wait_sec = (h * 3600) + (m * 60) + s %}
               {% set time_ok = (as_timestamp(now()) - as_timestamp(last_changed)) >= (wait_sec - 2) %}
 
-              {# Nachtsperre über Helfer #}
               {% set start_time = states(var_lock_start_ent) %}
               {% set end_time = states(var_lock_end_ent) %}
               {% set cur = now().strftime('%H:%M:%S') %}
