@@ -1,23 +1,29 @@
 blueprint:
   name: "Anwesenheits-Steuerung DB"
-  description: >
-    ### Version 1.4.3
+  description: >-
+    ### Version 1.4.4
     **Autor: D.B.**
 
-    DE: Logik mit universellem Sofort-Aus-Auslöser (Filter entfernt) und Nachtsperre über Helfer.
+    DE: Umfassende Logik zur Steuerung des Anwesenheitsstatus mit Aktivitätsprüfung, Nachtsperre über Helfer und manuellem Sofort-Aus.
     
-    EN: Logic with universal instant-off trigger (filter removed) and night lock via helpers.
+    EN: Comprehensive presence control logic with activity check, night lock via helpers, and manual instant-off.
   domain: automation
   input:
     activity_sensors:
       name: "Sensoren / Sensors"
-      description: "DE: Sensoren für Anwesenheit.\n\nEN: Sensors for presence."
+      description: >-
+        DE: Sensoren, die Anwesenheit anzeigen (BWM, Kontakte).
+        
+        EN: Sensors indicating presence (Motion, Contacts).
       selector:
         entity:
           multiple: true
     activity_states:
       name: "Zustände Aktiv / Active States"
-      description: "DE: Zustände für ANWESEND.\n\nEN: States for PRESENT."
+      description: >-
+        DE: Zustände, die als AKTIV gelten (z.B. on, motion, home).
+        
+        EN: States considered ACTIVE (e.g. on, motion, home).
       default: ["on", "motion", "occupied"]
       selector:
         select:
@@ -26,7 +32,10 @@ blueprint:
           options: ["on", "motion", "occupied", "home"]
     inactive_states:
       name: "Zustände Inaktiv / Inactive States"
-      description: "DE: Zustände für ABWESEND.\n\nEN: States for ABSENT."
+      description: >-
+        DE: Zustände, die als INAKTIV gelten (z.B. off, closed).
+        
+        EN: States considered INACTIVE (e.g. off, closed).
       default: ["off", "closed", "unavailable"]
       selector:
         select:
@@ -35,59 +44,98 @@ blueprint:
           options: ["off", "closed", "unavailable", "not_home"]
     presence_boolean:
       name: "Anwesenheits Status / Presence Status"
+      description: >-
+        DE: Der zentrale Helfer-Schalter für den Status.
+        
+        EN: The central helper switch for the status.
       selector:
         entity:
           filter:
             domain: input_boolean
     master_switch_presence:
       name: "Master: Anwesenheit / Master: Presence"
+      description: >-
+        DE: Erlaubt automatisches Setzen auf 'Anwesend'.
+        
+        EN: Allows automatic setting to 'Present'.
       selector:
         entity:
           filter:
             domain: input_boolean
     master_switch_absence:
       name: "Master: Abwesenheit / Master: Absence"
+      description: >-
+        DE: Erlaubt automatisches Setzen auf 'Abwesend'.
+        
+        EN: Allows automatic setting to 'Absent'.
       selector:
         entity:
           filter:
             domain: input_boolean
     manual_absence_switch:
       name: "Sofort-Abwesend Auslöser / Instant Absence Trigger"
-      description: "DE: Beliebiges Objekt (Taster, Schalter, Sensor), das bei 'on' die Abwesenheit einleitet.\n\nEN: Any entity that triggers absence when 'on'."
+      description: >-
+        DE: Beliebiges Objekt (Taster, Schalter, Sensor), das bei 'on' die Abwesenheit einleitet.
+        
+        EN: Any entity that triggers absence when 'on'.
       selector:
-        entity: {} # Filter entfernt für maximale Flexibilität
+        entity: {}
     manual_absence_delay:
       name: "Verzögerung für Sofort-Schalter / Delay for Instant Switch"
+      description: >-
+        DE: Zeit, die nach Drücken des Sofort-Schalters gewartet wird.
+        
+        EN: Delay after pressing the instant switch.
       default:
         seconds: 0
       selector:
         duration: {}
     absence_delay:
       name: "Wartezeit Abwesenheit / Absence Delay"
+      description: >-
+        DE: Zeit ohne Aktivität bis zur automatischen Abwesenheit.
+        
+        EN: Time without activity until automatic absence.
       default:
         minutes: 1
       selector:
         duration: {}
     night_lock_start_helper:
       name: "Nachtsperre beginnt um / Night lock starts at"
+      description: >-
+        DE: Helfer (nur Uhrzeit) für den Start der Sperre.
+        
+        EN: Helper (time only) for lock start.
       selector:
         entity:
           filter:
             domain: input_datetime
     night_lock_end_helper:
       name: "Nachtsperre endet um / Night lock ends at"
+      description: >-
+        DE: Helfer (nur Uhrzeit) für das Ende der Sperre.
+        
+        EN: Helper (time only) for lock end.
       selector:
         entity:
           filter:
             domain: input_datetime
     presence_counter:
       name: "Aktivitäts Counter / Activity Counter"
+      description: >-
+        DE: Counter-Helfer zum Filtern von Störungen.
+        
+        EN: Counter helper to filter triggers.
       selector:
         entity:
           filter:
             domain: counter
     counter_threshold:
       name: "Schwellenwert / Threshold"
+      description: >-
+        DE: Anzahl der Impulse für Status 'Anwesend'.
+        
+        EN: Number of triggers needed for 'Present'.
       default: 2
       selector:
         number:
@@ -95,6 +143,10 @@ blueprint:
           max: 10
     counter_reset_timeout:
       name: "Zeitfenster für Impulse / Counter Reset Timeout"
+      description: >-
+        DE: Innerhalb wie vieler Minuten müssen die Impulse erfolgen?
+        
+        EN: Triggers must occur within this many minutes.
       default: 5
       selector:
         number:
@@ -102,12 +154,20 @@ blueprint:
           max: 60
           unit_of_measurement: "min"
     absence_actions:
-      name: "Aktionen Abwesenheit"
+      name: "Aktionen Abwesenheit / Absence Actions"
+      description: >-
+        DE: Aktionen beim Verlassen (z.B. Licht aus).
+        
+        EN: Actions when leaving (e.g. lights off).
       default: []
       selector:
         action: {}
     presence_actions:
-      name: "Aktionen Anwesenheit"
+      name: "Aktionen Anwesenheit / Presence Actions"
+      description: >-
+        DE: Aktionen beim Ankommen (z.B. Licht an).
+        
+        EN: Actions when arriving (e.g. lights on).
       default: []
       selector:
         action: {}
@@ -135,7 +195,7 @@ trigger:
 
 action:
   - choose:
-      # --- FALL 1: SOFORT ABWESEND (Manueller Auslöser) ---
+      # --- FALL 1: SOFORT ABWESEND ---
       - conditions:
           - condition: template
             value_template: "{{ states(var_manual_trigger) == 'on' }}"
@@ -144,7 +204,6 @@ action:
           - action: input_boolean.turn_off
             target:
               entity_id: !input presence_boolean
-          # Setzt nur zurück, wenn es ein input_boolean ist
           - if:
               - condition: template
                 value_template: "{{ device_domain(var_manual_trigger) == 'input_boolean' }}"
