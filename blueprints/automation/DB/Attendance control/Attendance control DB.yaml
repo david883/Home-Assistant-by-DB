@@ -1,12 +1,12 @@
 blueprint:
   name: "Anwesenheits-Steuerung DB"
   description: >-
-    ### Version 1.4.4
+    ### Version 1.4.5
     **Autor: D.B.**
 
-    DE: Umfassende Logik zur Steuerung des Anwesenheitsstatus mit Aktivitätsprüfung, Nachtsperre über Helfer und manuellem Sofort-Aus.
+    DE: Logik mit multiplen Sofort-Auslösern, definierbaren Status-Listen und Nachtsperre über Helfer.
     
-    EN: Comprehensive presence control logic with activity check, night lock via helpers, and manual instant-off.
+    EN: Logic with multiple instant-off triggers, definable state lists, and night lock via helpers.
   domain: automation
   input:
     activity_sensors:
@@ -21,9 +21,9 @@ blueprint:
     activity_states:
       name: "Zustände Aktiv / Active States"
       description: >-
-        DE: Zustände, die als AKTIV gelten (z.B. on, motion, home).
+        DE: Zustände, die als AKTIV gelten (z.B. on, motion).
         
-        EN: States considered ACTIVE (e.g. on, motion, home).
+        EN: States considered ACTIVE (e.g. on, motion).
       default: ["on", "motion", "occupied"]
       selector:
         select:
@@ -72,20 +72,33 @@ blueprint:
         entity:
           filter:
             domain: input_boolean
-    manual_absence_switch:
-      name: "Sofort-Abwesend Auslöser / Instant Absence Trigger"
+    manual_absence_triggers:
+      name: "Sofort-Abwesend Auslöser / Instant Absence Triggers"
       description: >-
-        DE: Beliebiges Objekt (Taster, Schalter, Sensor), das bei 'on' die Abwesenheit einleitet.
+        DE: Liste von Objekten (Taster, Schalter), die sofort Abwesenheit auslösen.
         
-        EN: Any entity that triggers absence when 'on'.
+        EN: List of entities (buttons, switches) that trigger instant absence.
       selector:
-        entity: {}
+        entity:
+          multiple: true
+    manual_absence_states:
+      name: "Zustände für Sofort-Aus / States for Instant Absence"
+      description: >-
+        DE: Auf welche Zustände der Auslöser soll reagiert werden? (z.B. on).
+        
+        EN: Which states of the triggers should be reacted to? (e.g. on).
+      default: ["on"]
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          options: ["on", "off", "pressed", "active"]
     manual_absence_delay:
       name: "Verzögerung für Sofort-Schalter / Delay for Instant Switch"
       description: >-
-        DE: Zeit, die nach Drücken des Sofort-Schalters gewartet wird.
+        DE: Zeit, die nach dem Auslösen gewartet wird.
         
-        EN: Delay after pressing the instant switch.
+        EN: Delay after triggering.
       default:
         seconds: 0
       selector:
@@ -156,18 +169,18 @@ blueprint:
     absence_actions:
       name: "Aktionen Abwesenheit / Absence Actions"
       description: >-
-        DE: Aktionen beim Verlassen (z.B. Licht aus).
+        DE: Aktionen beim Verlassen.
         
-        EN: Actions when leaving (e.g. lights off).
+        EN: Actions when leaving.
       default: []
       selector:
         action: {}
     presence_actions:
       name: "Aktionen Anwesenheit / Presence Actions"
       description: >-
-        DE: Aktionen beim Ankommen (z.B. Licht an).
+        DE: Aktionen beim Ankommen.
         
-        EN: Actions when arriving (e.g. lights on).
+        EN: Actions when arriving.
       default: []
       selector:
         action: {}
@@ -182,35 +195,40 @@ variables:
   var_threshold: !input counter_threshold
   var_lock_start_ent: !input night_lock_start_helper
   var_lock_end_ent: !input night_lock_end_helper
-  var_manual_trigger: !input manual_absence_switch
+  var_manual_ents: !input manual_absence_triggers
+  var_manual_states: !input manual_absence_states
 
 trigger:
   - platform: state
     entity_id: !input activity_sensors
   - platform: state
-    entity_id: !input manual_absence_switch
-    to: "on"
+    entity_id: !input manual_absence_triggers
   - platform: time_pattern
     minutes: "/1"
 
 action:
   - choose:
-      # --- FALL 1: SOFORT ABWESEND ---
+      # --- FALL 1: SOFORT ABWESEND (Manueller Auslöser Liste) ---
       - conditions:
           - condition: template
-            value_template: "{{ states(var_manual_trigger) == 'on' }}"
+            value_template: >
+              {{ expand(var_manual_ents) | selectattr('state', 'in', var_manual_states) | list | count > 0 }}
         sequence:
           - delay: !input manual_absence_delay
           - action: input_boolean.turn_off
             target:
               entity_id: !input presence_boolean
-          - if:
-              - condition: template
-                value_template: "{{ device_domain(var_manual_trigger) == 'input_boolean' }}"
-            then:
-              - action: input_boolean.turn_off
-                target:
-                  entity_id: !input manual_absence_switch
+          # Automatisches Zurücksetzen für input_booleans in der Liste
+          - repeat:
+              for_each: "{{ var_manual_ents }}"
+              sequence:
+                - if:
+                    - condition: template
+                      value_template: "{{ device_domain(repeat.item) == 'input_boolean' and states(repeat.item) in var_manual_states }}"
+                  then:
+                    - action: input_boolean.turn_off
+                      target:
+                        entity_id: "{{ repeat.item }}"
           - action: counter.reset
             target:
               entity_id: !input presence_counter
