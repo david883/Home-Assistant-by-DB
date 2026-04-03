@@ -1,12 +1,26 @@
 blueprint:
   name: "Anwesenheits-Steuerung DB"
   description: >-
-    ### Version 1.4.7
+    ## 🛠 Installation & Support
+
+    ### PayPal Spende - Donation
+    Wenn dir dieser Blueprint gefällt, freue ich mich über eine kleine Unterstützung für die Kaffeekasse:
+    
+    [![PayPal Spende](https://www.paypalobjects.com/de_DE/DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
+    
+    ### Import
+    Klicke auf den Button, um den Blueprint direkt in deine Home Assistant Instanz zu importieren oder zu aktualisieren:
+    
+    [![Blueprint Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FAttendance%2520control%2FAttendance%2520control%2520DB.yaml)
+    
+    ---
+    
+    ### Version 03.04.2026-1
     **Autor: D.B.**
 
-    DE: Umfassende Logik mit Sofort-Aktionen, verzögertem Abwesenheits-Status und Nachtsperre über Helfer.
+    DE: Umfassende Logik zur Steuerung des Anwesenheitsstatus mit Aktivitätsprüfung, Nachtsperre über Helfer und manuellem Sofort-Aus.
     
-    EN: Comprehensive logic with instant actions, delayed absence status, and night lock via helpers.
+    EN: Comprehensive presence control logic with activity check, night lock via helpers, and manual instant-off.
   domain: automation
   input:
     activity_sensors:
@@ -21,9 +35,9 @@ blueprint:
     activity_states:
       name: "Zustände Aktiv - Active States"
       description: >-
-        DE: Zustände, die als AKTIV gelten (z.B. on, motion).
+        DE: Zustände, die als AKTIV gelten (z.B. on, motion, home).
         
-        EN: States considered ACTIVE (e.g. on, motion).
+        EN: States considered ACTIVE (e.g. on, motion, home).
       default: ["on", "motion", "occupied"]
       selector:
         select:
@@ -226,15 +240,12 @@ action:
               {% set recently_updated = (as_timestamp(now()) - as_timestamp(last_upd)) < 5 %}
               {{ state_match or recently_updated }}
         sequence:
-          # Sofortige Aktionen
           - choose: []
             default: !input instant_absence_actions
-          # Verzögerung für den Status-Wechsel
           - delay: !input manual_absence_delay
           - action: input_boolean.turn_off
             target:
               entity_id: !input presence_boolean
-          # Automatisches Zurücksetzen von Schaltern
           - repeat:
               for_each: "{{ var_manual_ents }}"
               sequence:
