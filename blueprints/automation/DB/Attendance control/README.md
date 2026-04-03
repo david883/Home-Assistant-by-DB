@@ -2,7 +2,7 @@
 
 ![Home Assistant Badge](https://img.shields.io/badge/Home%20Assistant-Blueprint-blue.svg)
 ![Version](https://img.shields.io/badge/Version-1.4.7-green.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+![License](https://img.shields.io/badge/License-GPL%203.0-red.svg)
 
 ---
 
@@ -44,9 +44,11 @@ Wenn dir dieser Blueprint gefällt, freue ich mich über eine kleine Unterstütz
 [![PayPal Spende](https://www.paypalobjects.com/de_DE/DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
 
 ### Import
-Klicke auf den Button, um den Blueprint direkt in deine Home Assistant Instanz zu importieren (ersetze `DEINE_GITHUB_URL` in der URL unten durch den direkten Link zu deiner YAML-Datei):
+Klicke auf den Button, um den Blueprint direkt in deine Home Assistant Instanz zu importieren:
 
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FDEINE_GITHUB_URL_HIER)
+[![Blueprint Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FDEIN_BENUTZERNAME%2FDEIN_REPOSITORY%2Fblob%2Fmain%2Fpresence_control_db.yaml)
+
+> **Hinweis:** Ersetze `DEIN_BENUTZERNAME` und `DEIN_REPOSITORY` im Link oben durch deine tatsächlichen GitHub-Daten, sobald du die Datei hochgeladen hast.
 
 ---
 
@@ -58,4 +60,4 @@ Klicke auf den Button, um den Blueprint direkt in deine Home Assistant Instanz z
 
 ---
 **Autor:** D.B.  
-**Lizenz:** MIT
+**Lizenz:** GNU GPL v3.0
