@@ -46,9 +46,7 @@ Wenn dir dieser Blueprint gefällt, freue ich mich über eine kleine Unterstütz
 ### Import
 Klicke auf den Button, um den Blueprint direkt in deine Home Assistant Instanz zu importieren:
 
-[![Blueprint Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FDEIN_BENUTZERNAME%2FDEIN_REPOSITORY%2Fblob%2Fmain%2Fpresence_control_db.yaml)
-
-> **Hinweis:** Ersetze `DEIN_BENUTZERNAME` und `DEIN_REPOSITORY` im Link oben durch deine tatsächlichen GitHub-Daten, sobald du die Datei hochgeladen hast.
+[![Blueprint Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FAttendance%2520control%2FAttendance%2520control%2520DB.yaml)
 
 ---
 
