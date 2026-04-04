@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 04.04.2026-15 Autor: D.B.
+    #### Version 04.04.2026-16 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -15,21 +15,19 @@ blueprint:
 
     ---
 
-    Überwacht Entitäten auf Statusänderungen. Nutzt einen Text-Helfer als Gedächtnis, um Fehlmeldungen bei kurzen Unterbrechungen zu verhindern.
-    Monitors entities for state changes. Uses a text helper as memory to prevent false alerts during short interruptions.
+    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als erweitertes Gedächtnis (kein 255-Zeichen Limit).
+    Monitors entities for state changes. Uses a dropdown (input_select) as extended memory (no 255-char limit).
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
   domain: automation
   input:
     monitored_entities:
       name: "Zu überwachende Entitäten / Entities to monitor"
-      description: "Wähle die Geräte aus, die überwacht werden sollen. / Select the devices to be monitored."
       selector:
         entity:
           multiple: true
     offline_states:
       name: "Offline Status-Wörter / Offline States"
-      description: "Zustände, die als 'Offline' gelten. / States considered as 'Offline'."
       default: [unavailable, unknown, not_home, offline, "off"]
       selector:
         select:
@@ -48,7 +46,6 @@ blueprint:
               value: "not_home"
     online_states:
       name: "Online Status-Wörter / Online States"
-      description: "Zustände, die als 'Online' gelten. / States considered as 'Online'."
       default: [available, home, online, "on"]
       selector:
         select:
@@ -65,7 +62,6 @@ blueprint:
               value: "on"
     offline_duration:
       name: "Offline Wartezeit (Minuten) / Offline duration"
-      description: "Zeit, bis die Offline-Meldung erfolgt. / Time before the offline notification occurs."
       default: 5
       selector:
         number:
@@ -74,7 +70,6 @@ blueprint:
           unit_of_measurement: min
     online_duration:
       name: "Online Wartezeit (Minuten) / Online duration"
-      description: "Zeit, bis die Online-Meldung erfolgt. / Time before the online notification occurs."
       default: 2
       selector:
         number:
@@ -83,29 +78,22 @@ blueprint:
           unit_of_measurement: min
     memory_helper:
       name: "Gedächtnis Helfer / Memory Helper"
-      description: "Wähle einen 'Text' Helfer aus (input_text). Dieser dient als Speicher für den Zustand. / Select a 'Text' helper (input_text) to store the state."
+      description: "Wähle einen 'Dropdown' Helfer aus (input_select). / Select a 'Dropdown' helper (input_select)."
       selector:
         entity:
-          domain: input_text
+          domain: input_select
     offline_actions:
       name: "Aktionen bei Offline / Offline Actions"
-      description: "Aktionen, wenn ein Gerät lange genug offline ist. / Actions when a device is offline long enough."
       default:
         - service: input_text.set_value
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
             value: "David: Das Gerät {{ device }} ist seit 5 Minuten nicht mehr erreichbar, folgende Geräte sind noch offline: {{ list }}"
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.netzwerkgerate_offline
-          data:
-            value: "Das Gerät {{ device }} ist offline. Weitere Geräte die offline sind: {{ list }}"
       selector:
         action: {}
     online_actions:
       name: "Aktionen bei Online / Online Actions"
-      description: "Aktionen, wenn ein zuvor gemeldetes Gerät wieder online ist. / Actions when a previously reported device is back online."
       default:
         - service: input_text.set_value
           target:
@@ -139,7 +127,7 @@ action:
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
       
-      # 1. Liste der anderen offline Geräte VOR den Aktionen berechnen
+      # Liste der anderen offline Geräte
       list: >
         {% set names = namespace(items=[]) %}
         {% for ent in monitored %}
@@ -149,35 +137,33 @@ action:
         {% endfor %}
         {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren / none' }}
       
-      # 2. Speicher-Status prüfen
-      current_mem_val: "{{ states(memory) }}"
-      is_in_memory: "{{ trigger_ent in current_mem_val if current_mem_val not in ['unknown', 'unavailable', 'none'] else false }}"
+      # Prüfen, ob das Gerät in den Optionen des Dropdowns steht
+      current_options: "{{ state_attr(memory, 'options') or [] }}"
+      is_in_memory: "{{ trigger_ent in current_options }}"
 
   - choose:
-      # OFFLINE: ID zum Speicher hinzufügen und Aktion ausführen
+      # OFFLINE: In Dropdown-Optionen aufnehmen
       - conditions:
           - condition: trigger
             id: "trigger_offline"
           - "{{ not is_in_memory }}"
         sequence:
-          - service: input_text.set_value
+          - service: input_select.set_options
             data:
               entity_id: "{{ memory }}"
-              value: >
-                {% set current = states(memory) %}
-                {% if current in ['unknown', 'none', 'unavailable'] %}{% set current = '' %}{% endif %}
-                {{ (current + ' ' + trigger_ent) | trim }}
+              options: "{{ (current_options + [trigger_ent]) | unique | list }}"
           - sequence: !input offline_actions
 
-      # ONLINE: ID aus Speicher entfernen und Aktion ausführen
+      # ONLINE: Aus Dropdown-Optionen entfernen
       - conditions:
           - condition: trigger
             id: "trigger_online"
           - "{{ is_in_memory }}"
         sequence:
-          - service: input_text.set_value
+          - service: input_select.set_options
             data:
               entity_id: "{{ memory }}"
-              value: >
-                {{ states(memory) | replace(trigger_ent, '') | replace('  ', ' ') | trim }}
+              options: >
+                {% set new_options = current_options | reject('eq', trigger_ent) | list %}
+                {{ new_options if new_options | count > 0 else ['leer'] }}
           - sequence: !input online_actions
