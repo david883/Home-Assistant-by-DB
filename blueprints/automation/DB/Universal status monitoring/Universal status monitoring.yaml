@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 04.04.2026-3 Autor: D.B.
+    #### Version 04.04.2026-4 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -9,7 +9,8 @@ blueprint:
 
     #### Dir gefällt meine Arbeit? 
 
-    Lade mich doch auf einen Kaffee oder ein kühles Getränk ein. Ich freue mich über jede kleine Unterstützung!
+    #### Lade mich doch auf einen Kaffee oder ein kühles Getränk ein. Ich freue mich über jede kleine Unterstützung!
+
 
     [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
 
