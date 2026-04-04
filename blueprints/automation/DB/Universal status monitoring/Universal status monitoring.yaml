@@ -8,7 +8,6 @@ blueprint:
     ---
 
     #### Dir gefällt meine Arbeit? 
-
     #### Lade mich doch auf einen Kaffee oder ein kühles Getränk ein. Ich freue mich über jede kleine Unterstützung!
 
     [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
@@ -29,7 +28,6 @@ blueprint:
           multiple: true
     offline_states:
       name: "Offline Status-Wörter / Offline States"
-      description: "Gib hier die Wörter ein die die Entitäten annehmen wenn sie offline sind. / Enter the states that count as offline."
       default: [unavailable, unknown, not_home, offline, "off"]
       selector:
         select:
@@ -48,7 +46,6 @@ blueprint:
               value: unknown
     online_states:
       name: "Online Status-Wörter / Online States"
-      description: "Gib hier die Wörter ein die die Entitäten annehmen und wenn sie online sind. / Enter the states that count as online."
       default: [available, home, online, "on"]
       selector:
         select:
@@ -65,7 +62,6 @@ blueprint:
               value: online
     offline_duration:
       name: "Offline Wartezeit (Minuten) / Offline duration"
-      description: "Die Dauer wie lange die Geräte offline sein müssen bis die Aktionen ausgeführt werden."
       default: 5
       selector:
         number:
@@ -74,7 +70,6 @@ blueprint:
           unit_of_measurement: minutes
     online_duration:
       name: "Online Wartezeit (Minuten) / Online duration"
-      description: "Die Dauer wie lange die Geräte wieder online sein müssen bis die Aktionen ausgeführt werden."
       default: 2
       selector:
         number:
@@ -83,7 +78,6 @@ blueprint:
           unit_of_measurement: minutes
     offline_actions:
       name: "Aktionen bei Offline / Offline Actions"
-      description: "Hier kann jede Aktion erstellt werden die Home Assistant unterstützt. Sende eine Nachricht, schalte einen Schalter, lass Alexa sprechen."
       default:
         - service: input_text.set_value
           target:
@@ -99,7 +93,6 @@ blueprint:
         action: {}
     online_actions:
       name: "Aktionen bei Online / Online Actions"
-      description: "Hier kann jede Aktion erstellt werden die Home Assistant unterstützt. Sende eine Nachricht, schalte einen Schalter, lass Alexa sprechen."
       default:
         - service: input_text.set_value
           target:
@@ -109,7 +102,7 @@ blueprint:
       selector:
         action: {}
 
-mode: restart
+mode: parallel
 
 trigger:
   - trigger: state
@@ -130,11 +123,8 @@ action:
   - variables:
       monitored: !input monitored_entities
       off_states: !input offline_states
-      off_duration: !input offline_duration
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
-      
-      # Liste der anderen aktuell offline befindlichen Geräte
       list: >
         {% set names = namespace(items=[]) %}
         {% for ent in monitored %}
@@ -147,16 +137,12 @@ action:
         {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren' }}
 
   - choose:
-      # OFFLINE CASE
       - conditions:
           - condition: trigger
             id: "trigger_offline"
         sequence: !input offline_actions
 
-      # ONLINE CASE (mit Zeit-Validierung)
       - conditions:
           - condition: trigger
             id: "trigger_online"
-          # PRÜFUNG: Hat das Gerät wirklich lange genug im Offline-Zustand verbracht?
-          - "{{ (now() - trigger.from_state.last_changed).total_seconds() >= (off_duration * 60) }}"
         sequence: !input online_actions
