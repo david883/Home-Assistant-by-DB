@@ -9,10 +9,13 @@ blueprint:
     
     PayPal Spende: https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN
 
+    GitHub Source: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
+
     Überwacht Entitäten rein auf Statusänderungen (z.B. unavailable, offline, off, usw. diese sind selbst änderbar).
     
     Je nach Status kann eine oder mehrere Aktionen ausgeführt werden.
 
+  source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
   domain: automation
   input:
     monitored_entities:
@@ -146,4 +149,3 @@ action:
           - condition: trigger
             id: "trigger_online"
         sequence: !input online_actions
-        
