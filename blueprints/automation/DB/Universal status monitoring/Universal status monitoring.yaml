@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 04.04.2026-10 Autor: D.B.
+    #### Version 04.04.2026-11 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -9,25 +9,27 @@ blueprint:
 
     #### Dir gefällt meine Arbeit? 
     #### Lade mich doch auf einen Kaffee oder ein kühles Getränk ein. Ich freue mich über jede kleine Unterstützung!
+    #### Do you like my work? Feel free to buy me a coffee or a cool drink. I appreciate any support!
 
     [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
 
     ---
 
-    Überwacht Entitäten rein auf Statusänderungen (z.B. unavailable, offline, off, usw. diese sind selbst änderbar).
-    
-    Je nach Status kann eine oder mehrere Aktionen ausgeführt werden.
+    Überwacht Entitäten auf Statusänderungen. Nutzt eine Gruppe als Gedächtnis, um Fehlmeldungen zu verhindern.
+    Monitors entities for state changes. Uses a group as memory to prevent false alerts.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
   domain: automation
   input:
     monitored_entities:
       name: "Zu überwachende Entitäten / Entities to monitor"
+      description: "Wähle die Geräte aus, die überwacht werden sollen. / Select the devices to be monitored."
       selector:
         entity:
           multiple: true
     offline_states:
       name: "Offline Status-Wörter / Offline States"
+      description: "Zustände, die als 'Offline' gelten. / States considered as 'Offline'."
       default: [unavailable, unknown, not_home, offline, "off"]
       selector:
         select:
@@ -46,6 +48,7 @@ blueprint:
               value: unknown
     online_states:
       name: "Online Status-Wörter / Online States"
+      description: "Zustände, die als 'Online' gelten. / States considered as 'Online'."
       default: [available, home, online, "on"]
       selector:
         select:
@@ -62,43 +65,38 @@ blueprint:
               value: online
     offline_duration:
       name: "Offline Wartezeit (Minuten) / Offline duration"
+      description: "Zeit, bis die Offline-Meldung erfolgt. / Time before the offline notification occurs."
       default: 5
       selector:
         number:
           min: 0
           max: 60
-          unit_of_measurement: minutes
+          unit_of_measurement: min
     online_duration:
       name: "Online Wartezeit (Minuten) / Online duration"
+      description: "Zeit, bis die Online-Meldung erfolgt. / Time before the online notification occurs."
       default: 2
       selector:
         number:
           min: 0
           max: 60
-          unit_of_measurement: minutes
+          unit_of_measurement: min
+    memory_group:
+      name: "Gedächtnis Gruppe / Memory Group"
+      description: "Wähle einen leeren Binären Sensor Gruppen-Helfer aus. / Select an empty Binary Sensor Group helper."
+      selector:
+        entity:
+          domain: binary_sensor
     offline_actions:
       name: "Aktionen bei Offline / Offline Actions"
-      default:
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.benachrichtigung_zum_verarbeiten
-          data:
-            value: "David: Das Gerät {{ device }} ist seit 5 Minuten nicht mehr erreichbar, folgende Geräte sind noch offline: {{ list }}"
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.netzwerkgerate_offline
-          data:
-            value: "Das Gerät {{ device }} ist offline. Weitere Geräte die offline sind {{ list }}"
+      description: "Aktionen, wenn ein Gerät lange genug offline ist. / Actions when a device is offline long enough."
+      default: []
       selector:
         action: {}
     online_actions:
       name: "Aktionen bei Online / Online Actions"
-      default:
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.benachrichtigung_zum_verarbeiten
-          data:
-            value: "David: Das Gerät {{ device }} ist wieder erreichbar, folgende Geräte sind noch offline: {{ list }}"
+      description: "Aktionen, wenn ein zuvor gemeldetes Gerät wieder online ist. / Actions when a previously reported device is back online."
+      default: []
       selector:
         action: {}
 
@@ -120,36 +118,55 @@ trigger:
 
 action:
   - variables:
+      memory: !input memory_group
       monitored: !input monitored_entities
       off_states: !input offline_states
-      off_dur: !input offline_duration
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
+      # Prüfen, ob das Gerät bereits in der Liste der Gruppe steht
+      # Checking if the device is already listed in the group
+      is_in_memory: >
+        {% set members = state_attr(memory, 'entity_id') %}
+        {{ trigger_ent in members if members is not none else false }}
+      
+      # Liste weiterer offline Geräte für die Nachricht
+      # List of other offline devices for the message
       list: >
         {% set names = namespace(items=[]) %}
         {% for ent in monitored %}
-          {% if ent != trigger_ent %}
-            {% if states(ent) in off_states %}
-              {% set names.items = names.items + [state_attr(ent, 'friendly_name') or ent] %}
-            {% endif %}
+          {% if ent != trigger_ent and states(ent) in off_states %}
+            {% set names.items = names.items + [state_attr(ent, 'friendly_name') or ent] %}
           {% endif %}
         {% endfor %}
-        {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren' }}
+        {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren / none' }}
 
   - choose:
-      # OFFLINE CASE
+      # OFFLINE: Gerät zur Gruppe hinzufügen und Aktionen ausführen
+      # OFFLINE: Add device to group and execute actions
       - conditions:
           - condition: trigger
             id: "trigger_offline"
-        sequence: !input offline_actions
+          - "{{ not is_in_memory }}"
+        sequence:
+          - service: group.set
+            data:
+              object_id: "{{ memory.split('.')[1] }}"
+              entities: >
+                {% set current = state_attr(memory, 'entity_id') or [] %}
+                {{ current + [trigger_ent] }}
+          - sequence: !input offline_actions
 
-      # ONLINE CASE
+      # ONLINE: Gerät aus Gruppe entfernen und Aktionen ausführen
+      # ONLINE: Remove device from group and execute actions
       - conditions:
           - condition: trigger
             id: "trigger_online"
-          - condition: template
-            # Diese Formel berechnet die echte Offline-Zeit, egal wie oft der Status zwischen "unavailable" und "unknown" gesprungen ist.
-            value_template: >
-              {% set last_changed = trigger.from_state.last_changed %}
-              {{ (now() - last_changed).total_seconds() >= (off_dur * 60) }}
-        sequence: !input online_actions
+          - "{{ is_in_memory }}"
+        sequence:
+          - service: group.set
+            data:
+              object_id: "{{ memory.split('.')[1] }}"
+              entities: >
+                {% set current = state_attr(memory, 'entity_id') or [] %}
+                {{ current | reject('eq', trigger_ent) | list }}
+          - sequence: !input online_actions
