@@ -1,0 +1,149 @@
+blueprint:
+  name: "Universelle Statusüberwachung DB"
+  description: >
+    ### Version 04.04.2026-1
+    **Autor: D.B.**
+
+    Dir gefällt meine Arbeit? Dann lade mich doch auf einen Kaffee oder ein kühles Getränk ein. 
+    Ich freue mich über jede kleine Unterstützung, um meine Projekte weiter voranzutreiben.
+    
+    PayPal Spende: https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN
+
+    Überwacht Entitäten rein auf Statusänderungen (z.B. unavailable, offline, off, usw. diese sind selbst änderbar).
+    
+    Je nach Status kann eine oder mehrere Aktionen ausgeführt werden.
+
+  domain: automation
+  input:
+    monitored_entities:
+      name: "Zu überwachende Entitäten / Entities to monitor"
+      selector:
+        entity:
+          multiple: true
+    offline_states:
+      name: "Offline Status-Wörter / Offline States"
+      description: "Gib hier die Wörter ein die die Entitäten annehmen wenn sie offline sind. / Enter the states that count as offline."
+      default: [unavailable, unknown, not_home, offline, "off"]
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          options:
+            - label: unavailable
+              value: unavailable
+            - label: "off"
+              value: "off"
+            - label: offline
+              value: offline
+            - label: not_home
+              value: not_home
+            - label: unknown
+              value: unknown
+    online_states:
+      name: "Online Status-Wörter / Online States"
+      description: "Gib hier die Wörter ein die die Entitäten annehmen und wenn sie online sind. / Enter the states that count as online."
+      default: [available, home, online, "on"]
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          options:
+            - label: available
+              value: available
+            - label: "on"
+              value: "on"
+            - label: home
+              value: home
+            - label: online
+              value: online
+    offline_duration:
+      name: "Offline Wartezeit (Minuten) / Offline duration"
+      description: "Die Dauer wie lange die Geräte offline sein müssen bis die Aktionen ausgeführt werden. / How long the device must be offline before actions trigger."
+      default: 5
+      selector:
+        number:
+          min: 0
+          max: 60
+          unit_of_measurement: minutes
+    online_duration:
+      name: "Online Wartezeit (Minuten) / Online duration"
+      description: "Die Dauer wie lange die Geräte wieder online sein müssen bis die Aktionen ausgeführt werden. / How long the device must be online before actions trigger."
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 60
+          unit_of_measurement: minutes
+    offline_actions:
+      name: "Aktionen bei Offline / Offline Actions"
+      description: "Hier kann jede Aktion erstellt werden die Home Assistant unterstützt. Sende eine Nachricht, schalte einen Schalter, lass Alexa sprechen. / Any HA action can be used here."
+      default:
+        - service: input_text.set_value
+          target:
+            entity_id: input_text.benachrichtigung_zum_verarbeiten
+          data:
+            value: "David: Das Gerät {{ device }} ist seit 5 Minuten nicht mehr erreichbar, folgende Geräte sind noch offline: {{ list }}"
+        - service: input_text.set_value
+          target:
+            entity_id: input_text.netzwerkgerate_offline
+          data:
+            value: "Das Gerät {{ device }} ist offline. Weitere Geräte die offline sind {{ list }}"
+      selector:
+        action: {}
+    online_actions:
+      name: "Aktionen bei Online / Online Actions"
+      description: "Hier kann jede Aktion erstellt werden die Home Assistant unterstützt. Sende eine Nachricht, schalte einen Schalter, lass Alexa sprechen. / Any HA action can be used here."
+      default:
+        - service: input_text.set_value
+          target:
+            entity_id: input_text.benachrichtigung_zum_verarbeiten
+          data:
+            value: "David: Das Gerät {{ device }} ist wieder erreichbar, folgende Geräte sind noch offline: {{ list }}"
+      selector:
+        action: {}
+
+mode: restart
+
+trigger:
+  - trigger: state
+    entity_id: !input monitored_entities
+    for:
+      minutes: !input offline_duration
+    id: "trigger_offline"
+    to: !input offline_states
+  - trigger: state
+    entity_id: !input monitored_entities
+    for:
+      minutes: !input online_duration
+    id: "trigger_online"
+    from: !input offline_states
+    to: !input online_states
+
+action:
+  - variables:
+      monitored: !input monitored_entities
+      off_states: !input offline_states
+      trigger_ent: "{{ trigger.entity_id }}"
+      device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
+      
+      list: >
+        {% set names = namespace(items=[]) %}
+        {% for ent in monitored %}
+          {% if ent != trigger_ent %}
+            {% if states(ent) in off_states %}
+              {% set names.items = names.items + [state_attr(ent, 'friendly_name') or ent] %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren' }}
+
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "trigger_offline"
+        sequence: !input offline_actions
+      - conditions:
+          - condition: trigger
+            id: "trigger_online"
+        sequence: !input online_actions
+        
