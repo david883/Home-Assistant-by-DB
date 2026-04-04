@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 04.04.2026-4 Autor: D.B.
+    #### Version 04.04.2026-5 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -10,7 +10,6 @@ blueprint:
     #### Dir gefällt meine Arbeit? 
 
     #### Lade mich doch auf einen Kaffee oder ein kühles Getränk ein. Ich freue mich über jede kleine Unterstützung!
-
 
     [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
 
@@ -66,7 +65,7 @@ blueprint:
               value: online
     offline_duration:
       name: "Offline Wartezeit (Minuten) / Offline duration"
-      description: "Die Dauer wie lange die Geräte offline sein müssen bis die Aktionen ausgeführt werden. / How long the device must be offline before actions trigger."
+      description: "Die Dauer wie lange die Geräte offline sein müssen bis die Aktionen ausgeführt werden."
       default: 5
       selector:
         number:
@@ -75,7 +74,7 @@ blueprint:
           unit_of_measurement: minutes
     online_duration:
       name: "Online Wartezeit (Minuten) / Online duration"
-      description: "Die Dauer wie lange die Geräte wieder online sein müssen bis die Aktionen ausgeführt werden. / How long the device must be online before actions trigger."
+      description: "Die Dauer wie lange die Geräte wieder online sein müssen bis die Aktionen ausgeführt werden."
       default: 2
       selector:
         number:
@@ -84,29 +83,10 @@ blueprint:
           unit_of_measurement: minutes
     offline_actions:
       name: "Aktionen bei Offline / Offline Actions"
-      description: "Hier kann jede Aktion erstellt werden die Home Assistant unterstützt. Sende eine Nachricht, schalte einen Schalter, lass Alexa sprechen. / Any HA action can be used here."
-      default:
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.benachrichtigung_zum_verarbeiten
-          data:
-            value: "David: Das Gerät {{ device }} ist seit 5 Minuten nicht mehr erreichbar, folgende Geräte sind noch offline: {{ list }}"
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.netzwerkgerate_offline
-          data:
-            value: "Das Gerät {{ device }} ist offline. Weitere Geräte die offline sind {{ list }}"
       selector:
         action: {}
     online_actions:
       name: "Aktionen bei Online / Online Actions"
-      description: "Hier kann jede Aktion erstellt werden die Home Assistant unterstützt. Sende eine Nachricht, schalte einen Schalter, lass Alexa sprechen. / Any HA action can be used here."
-      default:
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.benachrichtigung_zum_verarbeiten
-          data:
-            value: "David: Das Gerät {{ device }} ist wieder erreichbar, folgende Geräte sind noch offline: {{ list }}"
       selector:
         action: {}
 
@@ -131,9 +111,11 @@ action:
   - variables:
       monitored: !input monitored_entities
       off_states: !input offline_states
+      off_duration: !input offline_duration
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
       
+      # Liste der anderen aktuell offline befindlichen Geräte
       list: >
         {% set names = namespace(items=[]) %}
         {% for ent in monitored %}
@@ -146,11 +128,17 @@ action:
         {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren' }}
 
   - choose:
+      # OFFLINE CASE
       - conditions:
           - condition: trigger
             id: "trigger_offline"
         sequence: !input offline_actions
+
+      # ONLINE CASE (mit Zeit-Validierung)
       - conditions:
           - condition: trigger
             id: "trigger_online"
+          # PRÜFUNG: Hat das Gerät wirklich lange genug im Offline-Zustand verbracht?
+          # Wir prüfen, ob der letzte Zustandswechsel (zu Offline) länger her ist als die offline_duration.
+          - "{{ (now() - trigger.from_state.last_changed).total_seconds() >= (off_duration * 60) }}"
         sequence: !input online_actions
