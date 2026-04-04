@@ -33,6 +33,15 @@ blueprint:
         select:
           multiple: true
           custom_value: true
+          options:
+            - label: "unavailable"
+              value: "unavailable"
+            - label: "unknown"
+              value: "unknown"
+            - label: "offline"
+              value: "offline"
+            - label: "off"
+              value: "off"
     online_states:
       name: "Online Status-Wörter / Online States"
       default: [available, home, online, "on"]
@@ -40,6 +49,15 @@ blueprint:
         select:
           multiple: true
           custom_value: true
+          options:
+            - label: "available"
+              value: "available"
+            - label: "online"
+              value: "online"
+            - label: "home"
+              value: "home"
+            - label: "on"
+              value: "on"
     offline_duration:
       name: "Offline Wartezeit (Minuten) / Offline duration"
       default: 5
@@ -56,7 +74,7 @@ blueprint:
           max: 60
     memory_helper:
       name: "Gedächtnis Helfer / Memory Helper"
-      description: "Wähle einen 'Text' Helfer aus. / Select a 'Text' helper (input_text)."
+      description: "Wähle einen 'Text' Helfer aus (input_text). / Select a 'Text' helper."
       selector:
         entity:
           domain: input_text
@@ -94,11 +112,10 @@ action:
       off_states: !input offline_states
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
-      # Check: Steht die Entity ID bereits im Text-Speicher?
       is_in_memory: "{{ trigger_ent in states(memory) }}"
 
   - choose:
-      # OFFLINE: ID zum Text-Speicher hinzufügen
+      # OFFLINE: ID zum Speicher hinzufügen
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -109,11 +126,11 @@ action:
               entity_id: "{{ memory }}"
               value: >
                 {% set current = states(memory) %}
-                {% if current == 'unknown' or current == 'none' %}{% set current = '' %}{% endif %}
+                {% if current in ['unknown', 'none', 'unavailable'] %}{% set current = '' %}{% endif %}
                 {{ (current + ' ' + trigger_ent) | trim }}
           - sequence: !input offline_actions
 
-      # ONLINE: ID aus Text-Speicher entfernen
+      # ONLINE: ID aus Speicher entfernen
       - conditions:
           - condition: trigger
             id: "trigger_online"
@@ -126,7 +143,7 @@ action:
                 {{ states(memory) | replace(trigger_ent, '') | replace('  ', ' ') | trim }}
           - sequence: !input online_actions
 
-  # Liste weiterer offline Geräte berechnen
+  # Liste für Nachrichten
   - variables:
       list: >
         {% set names = namespace(items=[]) %}
