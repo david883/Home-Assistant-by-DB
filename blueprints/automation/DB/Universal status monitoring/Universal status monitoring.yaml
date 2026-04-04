@@ -42,6 +42,8 @@ blueprint:
               value: "offline"
             - label: "off"
               value: "off"
+            - label: "not_home"
+              value: "not_home"
     online_states:
       name: "Online Status-Wörter / Online States"
       default: [available, home, online, "on"]
@@ -112,7 +114,9 @@ action:
       off_states: !input offline_states
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
-      is_in_memory: "{{ trigger_ent in states(memory) }}"
+      # Sicherstellen, dass der Speicher gelesen werden kann
+      current_mem_val: "{{ states(memory) }}"
+      is_in_memory: "{{ trigger_ent in current_mem_val if current_mem_val not in ['unknown', 'unavailable', 'none'] else false }}"
 
   - choose:
       # OFFLINE: ID zum Speicher hinzufügen
@@ -143,7 +147,7 @@ action:
                 {{ states(memory) | replace(trigger_ent, '') | replace('  ', ' ') | trim }}
           - sequence: !input online_actions
 
-  # Liste für Nachrichten
+  # Liste für Nachrichten berechnen
   - variables:
       list: >
         {% set names = namespace(items=[]) %}
