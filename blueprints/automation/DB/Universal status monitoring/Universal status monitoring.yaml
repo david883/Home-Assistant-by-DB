@@ -4,12 +4,12 @@ blueprint:
     ### Version 04.04.2026-1
     **Autor: D.B.**
 
+    [![Home Assistant Import](https://my.home-assistant.io/badgelink/blueprint_import.svg?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
+
     Dir gefällt meine Arbeit? Dann lade mich doch auf einen Kaffee oder ein kühles Getränk ein. 
     Ich freue mich über jede kleine Unterstützung, um meine Projekte weiter voranzutreiben.
     
-    PayPal Spende: https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN
-
-    GitHub Source: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
+    [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
 
     Überwacht Entitäten rein auf Statusänderungen (z.B. unavailable, offline, off, usw. diese sind selbst änderbar).
     
