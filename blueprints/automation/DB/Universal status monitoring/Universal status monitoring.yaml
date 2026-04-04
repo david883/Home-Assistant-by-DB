@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 04.04.2026-11 Autor: D.B.
+    #### Version 04.04.2026-12 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -15,87 +15,58 @@ blueprint:
 
     ---
 
-    Überwacht Entitäten auf Statusänderungen. Nutzt eine Gruppe als Gedächtnis, um Fehlmeldungen zu verhindern.
-    Monitors entities for state changes. Uses a group as memory to prevent false alerts.
+    Überwacht Entitäten auf Statusänderungen. Nutzt eine Gruppe als Gedächtnis.
+    Monitors entities for state changes. Uses a group as memory.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
   domain: automation
   input:
     monitored_entities:
       name: "Zu überwachende Entitäten / Entities to monitor"
-      description: "Wähle die Geräte aus, die überwacht werden sollen. / Select the devices to be monitored."
       selector:
         entity:
           multiple: true
     offline_states:
       name: "Offline Status-Wörter / Offline States"
-      description: "Zustände, die als 'Offline' gelten. / States considered as 'Offline'."
       default: [unavailable, unknown, not_home, offline, "off"]
       selector:
         select:
           multiple: true
           custom_value: true
-          options:
-            - label: unavailable
-              value: unavailable
-            - label: "off"
-              value: "off"
-            - label: offline
-              value: offline
-            - label: not_home
-              value: not_home
-            - label: unknown
-              value: unknown
     online_states:
       name: "Online Status-Wörter / Online States"
-      description: "Zustände, die als 'Online' gelten. / States considered as 'Online'."
       default: [available, home, online, "on"]
       selector:
         select:
           multiple: true
           custom_value: true
-          options:
-            - label: available
-              value: available
-            - label: "on"
-              value: "on"
-            - label: home
-              value: home
-            - label: online
-              value: online
     offline_duration:
       name: "Offline Wartezeit (Minuten) / Offline duration"
-      description: "Zeit, bis die Offline-Meldung erfolgt. / Time before the offline notification occurs."
       default: 5
       selector:
         number:
           min: 0
           max: 60
-          unit_of_measurement: min
     online_duration:
       name: "Online Wartezeit (Minuten) / Online duration"
-      description: "Zeit, bis die Online-Meldung erfolgt. / Time before the online notification occurs."
       default: 2
       selector:
         number:
           min: 0
           max: 60
-          unit_of_measurement: min
     memory_group:
       name: "Gedächtnis Gruppe / Memory Group"
-      description: "Wähle einen leeren Binären Sensor Gruppen-Helfer aus. / Select an empty Binary Sensor Group helper."
+      description: "Binärer Sensor Gruppen-Helfer (leer lassen). / Binary Sensor Group helper (leave empty)."
       selector:
         entity:
           domain: binary_sensor
     offline_actions:
       name: "Aktionen bei Offline / Offline Actions"
-      description: "Aktionen, wenn ein Gerät lange genug offline ist. / Actions when a device is offline long enough."
       default: []
       selector:
         action: {}
     online_actions:
       name: "Aktionen bei Online / Online Actions"
-      description: "Aktionen, wenn ein zuvor gemeldetes Gerät wieder online ist. / Actions when a previously reported device is back online."
       default: []
       selector:
         action: {}
@@ -123,26 +94,12 @@ action:
       off_states: !input offline_states
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
-      # Prüfen, ob das Gerät bereits in der Liste der Gruppe steht
-      # Checking if the device is already listed in the group
-      is_in_memory: >
-        {% set members = state_attr(memory, 'entity_id') %}
-        {{ trigger_ent in members if members is not none else false }}
-      
-      # Liste weiterer offline Geräte für die Nachricht
-      # List of other offline devices for the message
-      list: >
-        {% set names = namespace(items=[]) %}
-        {% for ent in monitored %}
-          {% if ent != trigger_ent and states(ent) in off_states %}
-            {% set names.items = names.items + [state_attr(ent, 'friendly_name') or ent] %}
-          {% endif %}
-        {% endfor %}
-        {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren / none' }}
+      # Wir holen die aktuelle Liste der Gruppe direkt beim Start der Action
+      current_memory: "{{ state_attr(memory, 'entity_id') or [] }}"
+      is_in_memory: "{{ trigger_ent in current_memory }}"
 
   - choose:
-      # OFFLINE: Gerät zur Gruppe hinzufügen und Aktionen ausführen
-      # OFFLINE: Add device to group and execute actions
+      # OFFLINE: In Gruppe schreiben und Aktion ausführen
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -151,13 +108,10 @@ action:
           - service: group.set
             data:
               object_id: "{{ memory.split('.')[1] }}"
-              entities: >
-                {% set current = state_attr(memory, 'entity_id') or [] %}
-                {{ current + [trigger_ent] }}
+              entities: "{{ current_memory + [trigger_ent] }}"
           - sequence: !input offline_actions
 
-      # ONLINE: Gerät aus Gruppe entfernen und Aktionen ausführen
-      # ONLINE: Remove device from group and execute actions
+      # ONLINE: Aus Gruppe löschen und Aktion ausführen
       - conditions:
           - condition: trigger
             id: "trigger_online"
@@ -166,7 +120,16 @@ action:
           - service: group.set
             data:
               object_id: "{{ memory.split('.')[1] }}"
-              entities: >
-                {% set current = state_attr(memory, 'entity_id') or [] %}
-                {{ current | reject('eq', trigger_ent) | list }}
+              entities: "{{ current_memory | reject('eq', trigger_ent) | list }}"
           - sequence: !input online_actions
+
+  # Variable für die Nachrichten-Liste (wird erst hier berechnet, um aktuell zu sein)
+  - variables:
+      list: >
+        {% set names = namespace(items=[]) %}
+        {% for ent in monitored %}
+          {% if ent != trigger_ent and states(ent) in off_states %}
+            {% set names.items = names.items + [state_attr(ent, 'friendly_name') or ent] %}
+          {% endif %}
+        {% endfor %}
+        {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren / none' }}
