@@ -4,12 +4,26 @@ blueprint:
     ### Version 04.04.2026-1
     **Autor: D.B.**
 
-    [![Home Assistant Import](https://my.home-assistant.io/badgelink/blueprint_import.svg?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
-
-    Dir gefällt meine Arbeit? Dann lade mich doch auf einen Kaffee oder ein kühles Getränk ein. 
-    Ich freue mich über jede kleine Unterstützung, um meine Projekte weiter voranzutreiben.
-    
-    [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
+    <table width="100%" bgcolor="#2d2d2d" style="border-collapse: collapse;">
+      <tr>
+        <td align="left" style="padding: 15px; border-bottom: 1px solid #444;">
+          <strong>Dir gefällt meine Arbeit? Dann lade mich doch auf einen Kaffee oder ein kühles Getränk ein.</strong><br>
+          <small>Ich freue mich über jede kleine Unterstützung, um meine Projekte weiter voranzutreiben.</small>
+        </td>
+      </tr>
+      <tr>
+        <td align="left" style="padding: 15px;">
+          <a href="https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN" target="_blank">
+            <img src="https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Spenden mit PayPal" style="margin-bottom: 15px;">
+          </a>
+          <br>
+          <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml" target="_blank">
+            <img src="https://my.home-assistant.io/badgelink/blueprint_import.svg" alt="Import Blueprint to Home Assistant" style="width: 250px;">
+          </a>
+        </td>
+      </tr>
+    </table>
+    <br>
 
     Überwacht Entitäten rein auf Statusänderungen (z.B. unavailable, offline, off, usw. diese sind selbst änderbar).
     
