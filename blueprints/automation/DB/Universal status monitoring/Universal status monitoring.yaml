@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 04.04.2026-12 Autor: D.B.
+    #### Version 04.04.2026-13 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -15,8 +15,8 @@ blueprint:
 
     ---
 
-    Überwacht Entitäten auf Statusänderungen. Nutzt eine Gruppe als Gedächtnis.
-    Monitors entities for state changes. Uses a group as memory.
+    Überwacht Entitäten auf Statusänderungen. Nutzt eine 'Allgemeine Gruppe' als Gedächtnis.
+    Monitors entities for state changes. Uses a 'General Group' as memory.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
   domain: automation
@@ -56,10 +56,10 @@ blueprint:
           max: 60
     memory_group:
       name: "Gedächtnis Gruppe / Memory Group"
-      description: "Binärer Sensor Gruppen-Helfer (leer lassen). / Binary Sensor Group helper (leave empty)."
+      description: "Wähle einen 'Allgemeine Gruppe' Helfer aus. / Select a 'General Group' helper."
       selector:
         entity:
-          domain: binary_sensor
+          domain: group
     offline_actions:
       name: "Aktionen bei Offline / Offline Actions"
       default: []
@@ -94,12 +94,12 @@ action:
       off_states: !input offline_states
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
-      # Wir holen die aktuelle Liste der Gruppe direkt beim Start der Action
-      current_memory: "{{ state_attr(memory, 'entity_id') or [] }}"
-      is_in_memory: "{{ trigger_ent in current_memory }}"
+      # Aktuelle Entitäten in der Gruppe holen
+      current_entities: "{{ state_attr(memory, 'entity_id') or [] }}"
+      is_in_memory: "{{ trigger_ent in current_entities }}"
 
   - choose:
-      # OFFLINE: In Gruppe schreiben und Aktion ausführen
+      # OFFLINE: In Gruppe aufnehmen und Aktionen ausführen
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -108,10 +108,10 @@ action:
           - service: group.set
             data:
               object_id: "{{ memory.split('.')[1] }}"
-              entities: "{{ current_memory + [trigger_ent] }}"
+              entities: "{{ current_entities + [trigger_ent] }}"
           - sequence: !input offline_actions
 
-      # ONLINE: Aus Gruppe löschen und Aktion ausführen
+      # ONLINE: Aus Gruppe entfernen und Aktionen ausführen
       - conditions:
           - condition: trigger
             id: "trigger_online"
@@ -120,10 +120,10 @@ action:
           - service: group.set
             data:
               object_id: "{{ memory.split('.')[1] }}"
-              entities: "{{ current_memory | reject('eq', trigger_ent) | list }}"
+              entities: "{{ current_entities | reject('eq', trigger_ent) | list }}"
           - sequence: !input online_actions
 
-  # Variable für die Nachrichten-Liste (wird erst hier berechnet, um aktuell zu sein)
+  # Variable für Nachrichten-Liste
   - variables:
       list: >
         {% set names = namespace(items=[]) %}
