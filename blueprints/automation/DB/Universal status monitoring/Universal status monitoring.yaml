@@ -15,8 +15,8 @@ blueprint:
 
     ---
 
-    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als erweitertes Gedächtnis (kein 255-Zeichen Limit).
-    Monitors entities for state changes. Uses a dropdown (input_select) as extended memory (no 255-char limit).
+    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als erweitertes Gedächtnis mit dem Wort 'Platzhalter' als Basis.
+    Monitors entities for state changes. Uses a dropdown (input_select) as extended memory with the word 'Platzhalter' as base.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
   domain: automation
@@ -78,7 +78,7 @@ blueprint:
           unit_of_measurement: min
     memory_helper:
       name: "Gedächtnis Helfer / Memory Helper"
-      description: "Wähle einen 'Dropdown' Helfer aus (input_select). / Select a 'Dropdown' helper (input_select)."
+      description: "Wähle dein Dropdown 'input_select.offline_gedachtnis_status_monitoring_script'. / Select your dropdown helper."
       selector:
         entity:
           domain: input_select
@@ -127,7 +127,7 @@ action:
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
       
-      # Liste der anderen offline Geräte
+      # Liste der anderen offline Geräte berechnen
       list: >
         {% set names = namespace(items=[]) %}
         {% for ent in monitored %}
@@ -137,12 +137,12 @@ action:
         {% endfor %}
         {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren / none' }}
       
-      # Prüfen, ob das Gerät in den Optionen des Dropdowns steht
+      # Speicher-Check (ignoriert 'Platzhalter')
       current_options: "{{ state_attr(memory, 'options') or [] }}"
       is_in_memory: "{{ trigger_ent in current_options }}"
 
   - choose:
-      # OFFLINE: In Dropdown-Optionen aufnehmen
+      # OFFLINE: ID zum Dropdown hinzufügen
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -151,10 +151,12 @@ action:
           - service: input_select.set_options
             data:
               entity_id: "{{ memory }}"
-              options: "{{ (current_options + [trigger_ent]) | unique | list }}"
+              options: >
+                {% set new_list = (current_options + [trigger_ent]) | unique | reject('eq', 'Platzhalter') | list %}
+                {{ new_list }}
           - sequence: !input offline_actions
 
-      # ONLINE: Aus Dropdown-Optionen entfernen
+      # ONLINE: ID aus Dropdown entfernen
       - conditions:
           - condition: trigger
             id: "trigger_online"
@@ -164,6 +166,6 @@ action:
             data:
               entity_id: "{{ memory }}"
               options: >
-                {% set new_options = current_options | reject('eq', trigger_ent) | list %}
-                {{ new_options if new_options | count > 0 else ['leer'] }}
+                {% set new_options = current_options | reject('eq', trigger_ent) | reject('eq', 'Platzhalter') | list %}
+                {{ new_options if new_options | count > 0 else ['Platzhalter'] }}
           - sequence: !input online_actions
