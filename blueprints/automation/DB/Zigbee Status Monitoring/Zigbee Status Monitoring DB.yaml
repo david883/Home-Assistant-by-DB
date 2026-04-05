@@ -1,7 +1,7 @@
 blueprint:
   name: "Zigbee Statusüberwachung DB"
   description: >
-    #### Version 05.04.2026-01 Autor: D.B.
+    #### Version 05.04.2026-02 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FZigbee%2520Status%2520Monitoring%2FZigbee%2520Status%2520Monitoring%2520DB.yaml)
 
@@ -15,15 +15,15 @@ blueprint:
 
     ---
 
-    Überwacht Zigbee-Geräte basierend auf dem 'last_seen' Zeitstempel. Nutzt eine Auswahlliste (Dropdown) als erweitertes Gedächtnis.
-    Monitors Zigbee devices based on the 'last_seen' timestamp. Uses a dropdown (input_select) as extended memory.
+    Überwacht Zigbee-Geräte basierend auf dem 'last_seen' Zeitstempel. Berechnet die Inaktivität und führt eine Liste der betroffenen Geräte.
+    Monitors Zigbee devices based on 'last_seen'. Calculates inactivity and maintains a list of affected devices.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/main/blueprints/automation/DB/Zigbee%20Status%20Monitoring/Zigbee%20Status%20Monitoring%20DB.yaml
   domain: automation
   input:
     monitored_entities:
       name: "Zu überwachende last_seen Entitäten"
-      description: "Wähle die Sensoren aus, die den Zeitstempel liefern (z.B. sensor.gerät_last_seen)."
+      description: "Sensoren mit Zeitstempel (z.B. sensor.tannenbaumbeleuchtung_wohnzimmer_last_seen)"
       selector:
         entity:
           multiple: true
@@ -31,12 +31,21 @@ blueprint:
             - domain: sensor
     offline_threshold:
       name: "Offline Schwellenwert (Minuten)"
-      description: "Zeitspanne in Minuten, nach der ein Gerät als offline gilt."
+      description: "Wie lange darf das Gerät maximal schweigen, bevor es als Offline gilt?"
       default: 60
       selector:
         number:
           min: 1
           max: 1440
+          unit_of_measurement: min
+    online_threshold:
+      name: "Online Bestätigungszeit (Minuten)"
+      description: "Wie aktuell muss der Zeitstempel sein, um wieder als Online zu gelten? (Sollte kleiner als der Offline-Wert sein)"
+      default: 5
+      selector:
+        number:
+          min: 0
+          max: 60
           unit_of_measurement: min
     memory_helper:
       name: "Gedächtnis Helfer / Memory Helper"
@@ -51,7 +60,7 @@ blueprint:
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: Das Gerät {{ device }} ist seit über {{ threshold }} Minuten nicht mehr erreichbar."
+            value: "David: Das Gerät {{ device }} ist seit {{ threshold }} Minuten offline, folgende Geräte sind noch offline: {{ list }}"
       selector:
         action: {}
     online_actions:
@@ -61,7 +70,7 @@ blueprint:
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: Das Gerät {{ device }} hat sich wieder gemeldet und ist online."
+            value: "David: Das Gerät {{ device }} ist wieder erreichbar, folgende Geräte sind noch offline: {{ list }}"
       selector:
         action: {}
 
@@ -70,16 +79,17 @@ mode: parallel
 trigger:
   - trigger: time_pattern
     minutes: "/5"
-    id: "check_timer"
+    id: "timer"
   - trigger: state
     entity_id: !input monitored_entities
-    id: "device_update"
+    id: "update"
 
 action:
   - variables:
       memory: !input memory_helper
       monitored: !input monitored_entities
       threshold: !input offline_threshold
+      online_limit: !input online_threshold
       current_options: "{{ state_attr(memory, 'options') or [] }}"
 
   - repeat:
@@ -87,19 +97,35 @@ action:
       sequence:
         - variables:
             ent: "{{ repeat.item }}"
-            device: "{{ state_attr(ent, 'friendly_name') | replace(' last_seen', '') }}"
-            # Zeit-Differenz berechnen
+            device: "{{ state_attr(ent, 'friendly_name') | replace(' last_seen', '') | replace(' last seen', '') }}"
             last_seen_raw: "{{ states(ent) }}"
-            is_offline: >
+            
+            # Berechnung der Minuten seit letztem Kontakt
+            minutes_since: >
               {% if has_value(ent) and last_seen_raw not in ['unavailable', 'unknown'] %}
-                {{ (as_timestamp(now()) - as_timestamp(last_seen_raw)) / 60 > threshold | float }}
+                {{ (as_timestamp(now()) - as_timestamp(last_seen_raw)) / 60 }}
               {% else %}
-                true
+                9999
               {% endif %}
+
+            is_offline: "{{ minutes_since | float > threshold | float }}"
+            is_online: "{{ minutes_since | float <= online_limit | float }}"
             is_in_memory: "{{ ent in current_options }}"
 
+            # Liste der ANDEREN offline Geräte berechnen (wie im Original-Script)
+            list: >
+              {% set names = namespace(items=[]) %}
+              {% for item in monitored %}
+                {% set item_val = states(item) %}
+                {% set item_diff = (as_timestamp(now()) - as_timestamp(item_val)) / 60 if has_value(item) and item_val not in ['unavailable', 'unknown'] else 9999 %}
+                {% if item != ent and item_diff > threshold | float %}
+                  {% set names.items = names.items + [state_attr(item, 'friendly_name') | replace(' last_seen', '')] %}
+                {% endif %}
+              {% endfor %}
+              {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren' }}
+
         - choose:
-            # GEHT OFFLINE
+            # FALL: Wird neu als Offline erkannt
             - conditions:
                 - "{{ is_offline }}"
                 - "{{ not is_in_memory }}"
@@ -107,14 +133,12 @@ action:
                 - service: input_select.set_options
                   data:
                     entity_id: "{{ memory }}"
-                    options: >
-                      {% set new_list = (current_options + [ent]) | unique | reject('eq', 'Platzhalter') | list %}
-                      {{ new_list }}
+                    options: "{{ (current_options + [ent]) | unique | reject('eq', 'Platzhalter') | list }}"
                 - sequence: !input offline_actions
 
-            # GEHT ONLINE
+            # FALL: Wird wieder als Online erkannt (Zeitstempel aktuell genug)
             - conditions:
-                - "{{ not is_offline }}"
+                - "{{ is_online }}"
                 - "{{ is_in_memory }}"
               sequence:
                 - service: input_select.set_options
