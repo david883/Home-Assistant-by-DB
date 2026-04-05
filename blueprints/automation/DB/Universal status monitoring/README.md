@@ -36,7 +36,12 @@ This blueprint provides intelligent monitoring of Home Assistant entities for th
 ---
 
 ### 📊 Dashboard Integration
-Du kannst den aktuellen Status direkt in deinem Dashboard anzeigen lassen. Nutze dafür eine **Markdown-Karte** mit folgendem Code:
+
+> [!IMPORTANT]
+> **Hinweis:** Damit der folgende Code funktioniert, muss der Name des Input-Helfers exakt dem im Blueprint verwendeten Namen entsprechen:  
+> `input_select.offline_gedachtnis_status_monitoring_script`
+
+Kopiere diesen Code in eine **Markdown-Karte** in deinem Dashboard:
 
 ```yaml
 type: markdown
