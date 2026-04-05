@@ -15,29 +15,23 @@ blueprint:
     
     ---
     
-    ### Version 05.04.2026-3
+    ### Version 05.04.2026-4
     **Autor: D.B.**
 
-    DE: Umfassende Logik zur Steuerung des Anwesenheitsstatus mit Aktivitätsprüfung, Nachtsperre über Helfer und manuellem Sofort-Aus (ohne Verzögerung).
+    DE: Optimierte Aktions-Ausführung (Parallel-Modus) für Sofort-Auslöser und Sensoren.
     
-    EN: Comprehensive presence control logic with activity check, night lock via helpers, and manual instant-off (no delay).
+    EN: Optimized action execution (parallel mode) for instant triggers and sensors.
   domain: automation
   input:
     activity_sensors:
       name: "Sensoren - Sensors"
-      description: >-
-        DE: Sensoren, die Anwesenheit anzeigen (BWM, Kontakte).
-        
-        EN: Sensors indicating presence (Motion, Contacts).
+      description: "DE: Sensoren für Anwesenheit.\n\nEN: Presence sensors."
       selector:
         entity:
           multiple: true
     activity_states:
       name: "Zustände Aktiv - Active States"
-      description: >-
-        DE: Zustände, die als AKTIV gelten (z.B. on, motion, home).
-        
-        EN: States considered ACTIVE (e.g. on, motion, home).
+      description: "DE: Zustände für ANWESEND.\n\nEN: Active states."
       default: ["on", "motion", "occupied"]
       selector:
         select:
@@ -46,10 +40,7 @@ blueprint:
           options: ["on", "motion", "occupied", "home"]
     inactive_states:
       name: "Zustände Inaktiv - Inactive States"
-      description: >-
-        DE: Zustände, die als INAKTIV gelten (z.B. off, closed).
-        
-        EN: States considered INACTIVE (e.g. off, closed).
+      description: "DE: Zustände für ABWESEND.\n\nEN: Inactive states."
       default: ["off", "closed", "unavailable"]
       selector:
         select:
@@ -58,49 +49,34 @@ blueprint:
           options: ["off", "closed", "unavailable", "not_home"]
     presence_boolean:
       name: "Anwesenheits Status - Presence Status"
-      description: >-
-        DE: Der zentrale Helfer-Schalter (Input Boolean) für den aktuellen Status.
-        
-        EN: The central helper switch (input boolean) for the current status.
+      description: "DE: Der zentrale Status-Schalter.\n\nEN: Central status switch."
       selector:
         entity:
           filter:
             domain: input_boolean
     master_switch_presence:
       name: "Master: Anwesenheit - Master: Presence"
-      description: >-
-        DE: Erlaubt das automatische Setzen auf 'Anwesend' bei Sensor-Aktivität.
-        
-        EN: Allows automatic setting to 'Present' upon sensor activity.
+      description: "DE: Automatik für Ankunft erlauben.\n\nEN: Allow auto-arriving."
       selector:
         entity:
           filter:
             domain: input_boolean
     master_switch_absence:
       name: "Master: Abwesenheit - Master: Absence"
-      description: >-
-        DE: Erlaubt das automatische Setzen auf 'Abwesend' nach Ablauf der Wartezeit.
-        
-        EN: Allows automatic setting to 'Absent' after the delay expires.
+      description: "DE: Automatik für Verlassen erlauben.\n\nEN: Allow auto-leaving."
       selector:
         entity:
           filter:
             domain: input_boolean
     manual_absence_triggers:
       name: "Sofort-Abwesend Auslöser - Instant Absence Triggers"
-      description: >-
-        DE: Liste von Objekten (Taster, Schalter, Buttons), die sofort reagieren.
-        
-        EN: List of entities (buttons, switches) that react immediately.
+      description: "DE: Liste von Tastern/Buttons.\n\nEN: List of triggers."
       selector:
         entity:
           multiple: true
     manual_absence_states:
       name: "Zustände für Sofort-Aus - States for Instant Absence"
-      description: >-
-        DE: Zustände der Auslöser, die eine Aktion bewirken (z.B. on, pressed).
-        
-        EN: Trigger states that cause an action (e.g. on, pressed).
+      description: "DE: Status für Auslösung.\n\nEN: Trigger states."
       default: ["on"]
       selector:
         select:
@@ -109,50 +85,35 @@ blueprint:
           options: ["on", "off", "pressed", "active"]
     absence_delay:
       name: "Wartezeit Abwesenheit - Absence Delay"
-      description: >-
-        DE: Zeit ohne Sensor-Aktivität, bis die Automatik auf ABWESEND schaltet.
-        
-        EN: Time without sensor activity until the automation switches to ABSENT.
+      description: "DE: Verzögerung für die Automatik.\n\nEN: Delay for automation."
       default:
         minutes: 1
       selector:
         duration: {}
     night_lock_start_helper:
       name: "Nachtsperre beginnt um - Night lock starts at"
-      description: >-
-        DE: Input_datetime Helfer für den Beginn der Sperrzeit (kein automatisches Gehen).
-        
-        EN: Input_datetime helper for the start of the lock period (no auto-leaving).
+      description: "DE: Startzeit (Helfer).\n\nEN: Start time (helper)."
       selector:
         entity:
           filter:
             domain: input_datetime
     night_lock_end_helper:
       name: "Nachtsperre endet um - Night lock ends at"
-      description: >-
-        DE: Input_datetime Helfer für das Ende der Sperrzeit.
-        
-        EN: Input_datetime helper for the end of the lock period.
+      description: "DE: Endzeit (Helfer).\n\nEN: End time (helper)."
       selector:
         entity:
           filter:
             domain: input_datetime
     presence_counter:
       name: "Aktivitäts Counter - Activity Counter"
-      description: >-
-        DE: Counter-Helfer, der die Sensor-Impulse zählt, bevor auf ANWESEND geschaltet wird.
-        
-        EN: Counter helper that counts sensor triggers before switching to PRESENT.
+      description: "DE: Counter-Helfer auswählen.\n\nEN: Select counter."
       selector:
         entity:
           filter:
             domain: counter
     counter_threshold:
       name: "Schwellenwert - Threshold"
-      description: >-
-        DE: Anzahl der nötigen Sensor-Impulse innerhalb des Zeitfensters.
-        
-        EN: Number of required sensor triggers within the time window.
+      description: "DE: Impulse für Anwesenheit.\n\nEN: Triggers needed."
       default: 2
       selector:
         number:
@@ -160,10 +121,7 @@ blueprint:
           max: 10
     counter_reset_timeout:
       name: "Zeitfenster für Impulse - Counter Reset Timeout"
-      description: >-
-        DE: Zeitraum in Minuten, in dem die Impulse für den Schwellenwert erfolgen müssen.
-        
-        EN: Period in minutes within which the triggers for the threshold must occur.
+      description: "DE: Zeit für Impulse (Minuten).\n\nEN: Time window (min)."
       default: 5
       selector:
         number:
@@ -172,28 +130,19 @@ blueprint:
           unit_of_measurement: "min"
     instant_absence_actions:
       name: "Aktionen Sofort-Abwesend - Instant Absence Actions"
-      description: >-
-        DE: Aktionen, die SOFORT bei Betätigung des Auslösers starten.
-        
-        EN: Actions that start IMMEDIATELY upon trigger activation.
+      description: "DE: Aktionen bei Buttondruck.\n\nEN: Instant actions."
       default: []
       selector:
         action: {}
     absence_actions:
       name: "Aktionen Abwesenheit - Absence Actions"
-      description: >-
-        DE: Aktionen, die beim Wechsel in den Status ABWESEND ausgeführt werden.
-        
-        EN: Actions executed when switching to ABSENT status.
+      description: "DE: Aktionen beim Verlassen.\n\nEN: Actions on absence."
       default: []
       selector:
         action: {}
     presence_actions:
       name: "Aktionen Anwesenheit - Presence Actions"
-      description: >-
-        DE: Aktionen, die beim Wechsel in den Status ANWESEND ausgeführt werden.
-        
-        EN: Actions executed when switching to PRESENT status.
+      description: "DE: Aktionen bei Ankunft.\n\nEN: Actions on presence."
       default: []
       selector:
         action: {}
@@ -221,7 +170,7 @@ trigger:
 
 action:
   - choose:
-      # --- FALL 1: SOFORT-AUSLÖSER (Keine Verzögerung mehr) ---
+      # --- FALL 1: SOFORT-AUSLÖSER ---
       - conditions:
           - condition: or
             conditions:
@@ -234,35 +183,31 @@ action:
                   {% set recent = (as_timestamp(now()) - as_timestamp(last)) < 3 %}
                   {{ match or recent }}
         sequence:
-          # Sofortige Aktionen
-          - choose: []
-            default: !input instant_absence_actions
-          
-          # Status sofort ändern
-          - action: input_boolean.turn_off
-            target:
-              entity_id: !input presence_boolean
-          
-          # Counter sofort resetten
-          - action: counter.reset
-            target:
-              entity_id: !input presence_counter
-              
-          # Trigger-Schalter zurücksetzen
-          - repeat:
-              for_each: "{{ var_manual_ents }}"
-              sequence:
-                - if:
-                    - condition: template
-                      value_template: "{{ states(repeat.item) in var_manual_states }}"
-                  then:
-                    - action: homeassistant.turn_off
-                      target:
-                        entity_id: "{{ repeat.item }}"
-          
-          # Abwesenheits-Aktionen ausführen
-          - choose: []
-            default: !input absence_actions
+          - parallel:
+              # System-Status Änderungen
+              - sequence:
+                  - action: input_boolean.turn_off
+                    target:
+                      entity_id: !input presence_boolean
+                  - action: counter.reset
+                    target:
+                      entity_id: !input presence_counter
+                  - repeat:
+                      for_each: "{{ var_manual_ents }}"
+                      sequence:
+                        - if:
+                            - condition: template
+                              value_template: "{{ states(repeat.item) in var_manual_states }}"
+                          then:
+                            - action: homeassistant.turn_off
+                              target:
+                                entity_id: "{{ repeat.item }}"
+              # Benutzer-Aktionen
+              - sequence:
+                  - choose: []
+                    default: !input instant_absence_actions
+                  - choose: []
+                    default: !input absence_actions
 
       # --- FALL 2: AUTOMATISCH ABWESEND ---
       - conditions:
@@ -291,14 +236,17 @@ action:
               {% endif %}
               {{ active and time_ok and not locked }}
         sequence:
-          - action: input_boolean.turn_off
-            target:
-              entity_id: !input presence_boolean
-          - action: counter.reset
-            target:
-              entity_id: !input presence_counter
-          - choose: []
-            default: !input absence_actions
+          - parallel:
+              - sequence:
+                  - action: input_boolean.turn_off
+                    target:
+                      entity_id: !input presence_boolean
+                  - action: counter.reset
+                    target:
+                      entity_id: !input presence_counter
+              - sequence:
+                  - choose: []
+                    default: !input absence_actions
 
       # --- FALL 3: ANWESEND WERDEN ---
       - conditions:
@@ -319,14 +267,17 @@ action:
               - condition: template
                 value_template: "{{ states(var_counter) | int >= (var_threshold | int) }}"
             then:
-              - action: input_boolean.turn_on
-                target:
-                  entity_id: !input presence_boolean
-              - action: counter.reset
-                target:
-                  entity_id: !input presence_counter
-              - choose: []
-                default: !input presence_actions
+              - parallel:
+                  - sequence:
+                      - action: input_boolean.turn_on
+                        target:
+                          entity_id: !input presence_boolean
+                      - action: counter.reset
+                        target:
+                          entity_id: !input presence_counter
+                  - sequence:
+                      - choose: []
+                        default: !input presence_actions
             else:
               - wait_for_trigger:
                   - platform: state
