@@ -15,12 +15,12 @@ blueprint:
     
     ---
     
-    ### Version 05.04.2026-2
+    ### Version 05.04.2026-3
     **Autor: D.B.**
 
-    DE: Umfassende Logik zur Steuerung des Anwesenheitsstatus mit Aktivitätsprüfung, Nachtsperre über Helfer und manuellem Sofort-Aus.
+    DE: Umfassende Logik zur Steuerung des Anwesenheitsstatus mit Aktivitätsprüfung, Nachtsperre über Helfer und manuellem Sofort-Aus (ohne Verzögerung).
     
-    EN: Comprehensive presence control logic with activity check, night lock via helpers, and manual instant-off.
+    EN: Comprehensive presence control logic with activity check, night lock via helpers, and manual instant-off (no delay).
   domain: automation
   input:
     activity_sensors:
@@ -107,16 +107,6 @@ blueprint:
           multiple: true
           custom_value: true
           options: ["on", "off", "pressed", "active"]
-    manual_absence_delay:
-      name: "Verzögerung für Sofort-Schalter - Delay for Instant Switch"
-      description: >-
-        DE: Zeit, die nach dem Auslösen gewartet wird, bevor der Status auf ABWESEND springt.
-        
-        EN: Time to wait after triggering before the status changes to ABSENT.
-      default:
-        seconds: 0
-      selector:
-        duration: {}
     absence_delay:
       name: "Wartezeit Abwesenheit - Absence Delay"
       description: >-
@@ -183,9 +173,9 @@ blueprint:
     instant_absence_actions:
       name: "Aktionen Sofort-Abwesend - Instant Absence Actions"
       description: >-
-        DE: Aktionen, die SOFORT bei Betätigung des Auslösers starten (vor der Verzögerung).
+        DE: Aktionen, die SOFORT bei Betätigung des Auslösers starten.
         
-        EN: Actions that start IMMEDIATELY upon trigger activation (before the delay).
+        EN: Actions that start IMMEDIATELY upon trigger activation.
       default: []
       selector:
         action: {}
@@ -231,7 +221,7 @@ trigger:
 
 action:
   - choose:
-      # --- FALL 1: SOFORT-AUSLÖSER ---
+      # --- FALL 1: SOFORT-AUSLÖSER (Keine Verzögerung mehr) ---
       - conditions:
           - condition: or
             conditions:
@@ -244,15 +234,21 @@ action:
                   {% set recent = (as_timestamp(now()) - as_timestamp(last)) < 3 %}
                   {{ match or recent }}
         sequence:
+          # Sofortige Aktionen
           - choose: []
             default: !input instant_absence_actions
-          - delay: !input manual_absence_delay
+          
+          # Status sofort ändern
           - action: input_boolean.turn_off
             target:
               entity_id: !input presence_boolean
+          
+          # Counter sofort resetten
           - action: counter.reset
             target:
               entity_id: !input presence_counter
+              
+          # Trigger-Schalter zurücksetzen
           - repeat:
               for_each: "{{ var_manual_ents }}"
               sequence:
@@ -263,6 +259,8 @@ action:
                     - action: homeassistant.turn_off
                       target:
                         entity_id: "{{ repeat.item }}"
+          
+          # Abwesenheits-Aktionen ausführen
           - choose: []
             default: !input absence_actions
 
