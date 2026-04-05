@@ -1,7 +1,7 @@
 blueprint:
   name: "Zigbee Statusüberwachung DB"
   description: >
-    #### Version 05.04.2026-05 Autor: D.B.
+    #### Version 05.04.2026-06 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FZigbee%2520Status%2520Monitoring%2FZigbee%2520Status%2520Monitoring%2520DB.yaml)
 
@@ -14,14 +14,14 @@ blueprint:
 
     ---
 
-    Überwacht Zigbee-Geräte via 'last_seen'. Die Prüfung erfolgt hardware-schonend einmal pro Minute.
+    Überwacht Zigbee-Geräte via 'last_seen'. Die Prüfung erfolgt hardware-schonend einmal pro Minute. 
+    Variable `{{ count }}` steht in den Aktionen für die Anzahl der überwachten Geräte zur Verfügung.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/main/blueprints/automation/DB/Zigbee%20Status%20Monitoring/Zigbee%20Status%20Monitoring%20DB.yaml
   domain: automation
   input:
     monitored_entities:
       name: "Zu überwachende last_seen Entitäten"
-      description: "Wähle die Sensoren aus. (Hinweis: Die Anzahl der gewählten Entitäten wird in der Automatisierungs-Übersicht verwaltet.)"
       selector:
         entity:
           multiple: true
@@ -37,6 +37,7 @@ blueprint:
           unit_of_measurement: min
     online_confirmation:
       name: "Online Bestätigungszeit (Minuten)"
+      description: "Gerät gilt erst als 'Online', wenn der Zeitstempel jünger als dieser Wert ist."
       default: 5
       selector:
         number:
@@ -55,7 +56,7 @@ blueprint:
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: {{ device }} ist offline. Andere: {{ list }}. (Gesamt überwacht: {{ count }})"
+            value: "David: {{ device }} ist offline. Andere: {{ list }}. (Überwacht: {{ count }})"
       selector:
         action: {}
     online_actions:
@@ -65,7 +66,7 @@ blueprint:
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: {{ device }} ist wieder online. Noch offline: {{ list }}"
+            value: "David: {{ device }} ist wieder online. Noch offline: {{ list }}. (Überwacht: {{ count }})"
       selector:
         action: {}
 
@@ -81,7 +82,7 @@ action:
       monitored: !input monitored_entities
       off_limit: !input offline_threshold
       on_confirm: !input online_confirmation
-      # Hier wird der Zähler für die Benachrichtigungen berechnet
+      # Der Counter wird hier für die gesamte Automation festgelegt
       count: "{{ monitored | count }}"
 
   - repeat:
@@ -116,6 +117,7 @@ action:
               {{ names.items | join(', ') if names.items | count > 0 else 'keine' }}
 
         - choose:
+            # GEHT OFFLINE
             - conditions:
                 - "{{ is_offline_now }}"
                 - "{{ not is_in_memory }}"
@@ -126,6 +128,7 @@ action:
                     options: "{{ (state_attr(memory, 'options') + [ent]) | unique | reject('eq', 'Platzhalter') | list }}"
                 - sequence: !input offline_actions
 
+            # GEHT ONLINE
             - conditions:
                 - "{{ is_confirmed_online }}"
                 - "{{ is_in_memory }}"
