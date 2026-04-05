@@ -15,12 +15,12 @@ blueprint:
     
     ---
     
-    ### Version 06.04.2026-1
+    ### Version 06.04.2026-2
     **Autor: D.B.**
 
-    DE: Sequenzielle Ausführung (1s Abstand) und direkte Zeiteingabe für die Nachtsperre.
+    DE: Master-Schalter und Nachtsperre jetzt direkt als Checkbox/Zeit im Blueprint (keine extra Helfer nötig).
     
-    EN: Sequential execution (1s delay) and direct time input for the night lock.
+    EN: Master switches and night lock now directly as checkbox/time in blueprint (no extra helpers needed).
   domain: automation
   input:
     activity_sensors:
@@ -66,26 +66,24 @@ blueprint:
         entity:
           filter:
             domain: input_boolean
-    master_switch_presence:
-      name: "Master: Anwesenheit - Master: Presence"
+    master_presence_enabled:
+      name: "Master: Anwesenheit aktivieren - Master: Presence enabled"
       description: >-
-        DE: Erlaubt das automatische Setzen auf 'Anwesend'.
+        DE: Soll die Automatik automatisch auf 'Anwesend' schalten?
         
-        EN: Allows automatic setting to 'Present'.
+        EN: Should the automation automatically switch to 'Present'?
+      default: true
       selector:
-        entity:
-          filter:
-            domain: input_boolean
-    master_switch_absence:
-      name: "Master: Abwesenheit - Master: Absence"
+        boolean: {}
+    master_absence_enabled:
+      name: "Master: Abwesenheit aktivieren - Master: Absence enabled"
       description: >-
-        DE: Erlaubt das automatische Setzen auf 'Abwesend'.
+        DE: Soll die Automatik automatisch auf 'Abwesend' schalten?
         
-        EN: Allows automatic setting to 'Absent'.
+        EN: Should the automation automatically switch to 'Absent'?
+      default: true
       selector:
-        entity:
-          filter:
-            domain: input_boolean
+        boolean: {}
     manual_absence_triggers:
       name: "Sofort-Abwesend Auslöser - Instant Absence Triggers"
       description: >-
@@ -206,6 +204,8 @@ variables:
   var_threshold: !input counter_threshold
   var_lock_start: !input night_lock_start
   var_lock_end: !input night_lock_end
+  var_master_presence: !input master_presence_enabled
+  var_master_absence: !input master_absence_enabled
   var_manual_ents: !input manual_absence_triggers
   var_manual_states: !input manual_absence_states
 
@@ -262,9 +262,8 @@ action:
           - condition: state
             entity_id: !input presence_boolean
             state: "on"
-          - condition: state
-            entity_id: !input master_switch_absence
-            state: "on"
+          - condition: template
+            value_template: "{{ var_master_absence }}"
           - condition: template
             value_template: >
               {% set active = expand(var_sensors) | selectattr('state', 'in', var_states_active) | list | count == 0 %}
@@ -299,9 +298,8 @@ action:
           - condition: state
             entity_id: !input presence_boolean
             state: "off"
-          - condition: state
-            entity_id: !input master_switch_presence
-            state: "on"
+          - condition: template
+            value_template: "{{ var_master_presence }}"
           - condition: template
             value_template: >
               {{ expand(var_sensors) | selectattr('state', 'in', var_states_active) | list | count > 0 }}
