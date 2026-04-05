@@ -1,7 +1,7 @@
 blueprint:
   name: "Zigbee Statusüberwachung DB"
   description: >
-    #### Version 05.04.2026-02 Autor: D.B.
+    #### Version 05.04.2026-03 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FZigbee%2520Status%2520Monitoring%2FZigbee%2520Status%2520Monitoring%2520DB.yaml)
 
@@ -9,21 +9,18 @@ blueprint:
 
     #### Dir gefällt meine Arbeit? 
     #### Lade mich doch auf einen Kaffee oder ein kühles Getränk ein. Ich freue mich über jede kleine Unterstützung!
-    #### Do you like my work? Feel free to buy me a coffee or a cool drink. I appreciate any support!
 
     [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
 
     ---
 
-    Überwacht Zigbee-Geräte basierend auf dem 'last_seen' Zeitstempel. Berechnet die Inaktivität und führt eine Liste der betroffenen Geräte.
-    Monitors Zigbee devices based on 'last_seen'. Calculates inactivity and maintains a list of affected devices.
+    Überwacht Zigbee-Geräte via 'last_seen'. Ein Gerät wird erst nach Ablauf der Online-Bestätigungszeit wieder als "Online" gewertet.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/main/blueprints/automation/DB/Zigbee%20Status%20Monitoring/Zigbee%20Status%20Monitoring%20DB.yaml
   domain: automation
   input:
     monitored_entities:
       name: "Zu überwachende last_seen Entitäten"
-      description: "Sensoren mit Zeitstempel (z.B. sensor.tannenbaumbeleuchtung_wohnzimmer_last_seen)"
       selector:
         entity:
           multiple: true
@@ -31,46 +28,45 @@ blueprint:
             - domain: sensor
     offline_threshold:
       name: "Offline Schwellenwert (Minuten)"
-      description: "Wie lange darf das Gerät maximal schweigen, bevor es als Offline gilt?"
+      description: "Zeitüberschreitung, ab der ein Gerät als offline gilt (z.B. 60)."
       default: 60
       selector:
         number:
           min: 1
           max: 1440
           unit_of_measurement: min
-    online_threshold:
+    online_confirmation:
       name: "Online Bestätigungszeit (Minuten)"
-      description: "Wie aktuell muss der Zeitstempel sein, um wieder als Online zu gelten? (Sollte kleiner als der Offline-Wert sein)"
+      description: "Das Gerät muss einen Zeitstempel haben, der jünger als dieser Wert ist, um als 'wieder da' zu gelten."
       default: 5
       selector:
         number:
-          min: 0
+          min: 1
           max: 60
           unit_of_measurement: min
     memory_helper:
       name: "Gedächtnis Helfer / Memory Helper"
-      description: "Wähle dein Dropdown 'input_select.offline_gedachtnis_status_monitoring_script'."
       selector:
         entity:
           domain: input_select
     offline_actions:
-      name: "Aktionen bei Offline / Offline Actions"
+      name: "Aktionen bei Offline"
       default:
         - service: input_text.set_value
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: Das Gerät {{ device }} ist seit {{ threshold }} Minuten offline, folgende Geräte sind noch offline: {{ list }}"
+            value: "David: {{ device }} ist offline. Andere: {{ list }}"
       selector:
         action: {}
     online_actions:
-      name: "Aktionen bei Online / Online Actions"
+      name: "Aktionen bei Online"
       default:
         - service: input_text.set_value
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: Das Gerät {{ device }} ist wieder erreichbar, folgende Geräte sind noch offline: {{ list }}"
+            value: "David: {{ device }} ist wieder online. Noch offline: {{ list }}"
       selector:
         action: {}
 
@@ -79,17 +75,15 @@ mode: parallel
 trigger:
   - trigger: time_pattern
     minutes: "/5"
-    id: "timer"
   - trigger: state
     entity_id: !input monitored_entities
-    id: "update"
 
 action:
   - variables:
       memory: !input memory_helper
       monitored: !input monitored_entities
-      threshold: !input offline_threshold
-      online_limit: !input online_threshold
+      off_limit: !input offline_threshold
+      on_confirm: !input online_confirmation
       current_options: "{{ state_attr(memory, 'options') or [] }}"
 
   - repeat:
@@ -100,34 +94,37 @@ action:
             device: "{{ state_attr(ent, 'friendly_name') | replace(' last_seen', '') | replace(' last seen', '') }}"
             last_seen_raw: "{{ states(ent) }}"
             
-            # Berechnung der Minuten seit letztem Kontakt
-            minutes_since: >
+            # Minuten seit der letzten Meldung
+            diff: >
               {% if has_value(ent) and last_seen_raw not in ['unavailable', 'unknown'] %}
                 {{ (as_timestamp(now()) - as_timestamp(last_seen_raw)) / 60 }}
               {% else %}
                 9999
               {% endif %}
 
-            is_offline: "{{ minutes_since | float > threshold | float }}"
-            is_online: "{{ minutes_since | float <= online_limit | float }}"
+            # Logik:
+            # Offline wenn diff > off_limit
+            # Online wenn diff < on_confirm (Bestätigung dass es wirklich aktuell ist)
+            is_offline_now: "{{ diff | float > off_limit | float }}"
+            is_confirmed_online: "{{ diff | float < on_confirm | float }}"
             is_in_memory: "{{ ent in current_options }}"
 
-            # Liste der ANDEREN offline Geräte berechnen (wie im Original-Script)
+            # Liste berechnen
             list: >
               {% set names = namespace(items=[]) %}
               {% for item in monitored %}
-                {% set item_val = states(item) %}
-                {% set item_diff = (as_timestamp(now()) - as_timestamp(item_val)) / 60 if has_value(item) and item_val not in ['unavailable', 'unknown'] else 9999 %}
-                {% if item != ent and item_diff > threshold | float %}
+                {% set val = states(item) %}
+                {% set d = (as_timestamp(now()) - as_timestamp(val)) / 60 if has_value(item) and val not in ['unavailable', 'unknown'] else 9999 %}
+                {% if item != ent and d > off_limit | float %}
                   {% set names.items = names.items + [state_attr(item, 'friendly_name') | replace(' last_seen', '')] %}
                 {% endif %}
               {% endfor %}
-              {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren' }}
+              {{ names.items | join(', ') if names.items | count > 0 else 'keine' }}
 
         - choose:
-            # FALL: Wird neu als Offline erkannt
+            # WECHSEL ZU OFFLINE
             - conditions:
-                - "{{ is_offline }}"
+                - "{{ is_offline_now }}"
                 - "{{ not is_in_memory }}"
               sequence:
                 - service: input_select.set_options
@@ -136,9 +133,9 @@ action:
                     options: "{{ (current_options + [ent]) | unique | reject('eq', 'Platzhalter') | list }}"
                 - sequence: !input offline_actions
 
-            # FALL: Wird wieder als Online erkannt (Zeitstempel aktuell genug)
+            # WECHSEL ZU ONLINE (Nur wenn Zeitstempel "frisch" genug ist)
             - conditions:
-                - "{{ is_online }}"
+                - "{{ is_confirmed_online }}"
                 - "{{ is_in_memory }}"
               sequence:
                 - service: input_select.set_options
