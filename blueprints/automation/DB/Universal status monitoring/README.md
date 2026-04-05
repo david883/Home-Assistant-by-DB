@@ -12,7 +12,6 @@ Dieser Blueprint ermöglicht eine intelligente Überwachung von Home Assistant E
 * **Dynamische Listen:** In den Benachrichtigungen wird automatisch aufgelistet, welche *anderen* Geräte ebenfalls gerade offline sind.
 * **Flexible Status-Definition:** Freie Auswahl, welche Zustände (z. B. `unavailable`, `unknown`, `not_home`, `off`) als "Offline" gewertet werden sollen.
 * **Verzögerungsfilter:** Einstellbare Wartezeiten für Online- und Offline-Events, um Fehlalarme bei kurzen Verbindungsabbrüchen zu vermeiden.
-* **Effizienz:** Aktionen werden nur bei tatsächlichen Statusänderungen im Gedächtnis ausgelöst.
 
 ---
 
@@ -24,29 +23,36 @@ This blueprint provides intelligent monitoring of Home Assistant entities for th
 * **Dynamic Lists:** Notifications automatically list which *other* devices are also currently offline.
 * **Custom States:** Flexible selection of which states (e.g., `unavailable`, `unknown`, `not_home`, `off`) are considered "Offline".
 * **Duration Filters:** Adjustable wait times for online and offline events to prevent false alarms during brief connection hiccups.
-* **Efficiency:** Actions are only triggered when the status in the memory actually changes.
 
 ---
 
 ### 🛠 Einrichtung / Setup
 
 1.  **Helfer erstellen / Create Helper:** Erstelle einen `input_select` (Auswahlliste) Helfer.
-2.  **Platzhalter:** Füge der Liste als erste Option das Wort `Platzhalter` hinzu (dies dient als Basis für das Script).
-3.  **Blueprint importieren:** Nutze den blauen Button oben, um den Blueprint in dein Home Assistant zu laden.
-4.  **Konfigurieren:** Wähle die zu überwachenden Entitäten aus und definiere deine gewünschten Aktionen (z.B. Benachrichtigung per App).
+2.  **Platzhalter:** Füge der Liste als erste Option das Wort `Platzhalter` hinzu.
+3.  **Blueprint importieren:** Nutze den blauen Button oben.
+4.  **Konfigurieren:** Wähle die zu überwachenden Entitäten und deine Aktionen aus.
 
 ---
 
-### ☕ Unterstützung / Support
+### 📊 Dashboard Integration
+Du kannst den aktuellen Status direkt in deinem Dashboard anzeigen lassen. Nutze dafür eine **Markdown-Karte** mit folgendem Code:
 
-Dir gefällt meine Arbeit? Lade mich doch auf einen Kaffee oder ein kühles Getränk ein. Ich freue mich über jede kleine Unterstützung!
+```yaml
+type: markdown
+content: >
+  ### ⚠️ Netzwerk-Status
+  
+  {% set offline_ids = state_attr('input_select.offline_gedachtnis_status_monitoring_script', 'options') %}
+  {% set real_offline = offline_ids | reject('eq', 'Platzhalter') | list %}
 
-Do you like my work? Feel free to buy me a coffee or a cool drink. I appreciate any support!
-
-[![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
-
----
-
-**Version:** 04.04.2026-16  
-**Autor:** D.B.  
-**Source:** [GitHub Repository](https://github.com/david883/Home-Assistant-by-DB)
+  {% if real_offline | count > 0 %}
+    **Aktuell offline:**
+    
+    {% for ent in real_offline %}
+    - **{{ state_attr(ent, 'friendly_name') or ent }}** *(Seit: {{ as_timestamp(states[ent].last_changed) | timestamp_custom('%H:%M Uhr') }})*
+    {% endfor %}
+  {% else %}
+    ✅ **Alle Geräte sind online.**
+  {% endif %}
+title: Geräte-Überwachung
