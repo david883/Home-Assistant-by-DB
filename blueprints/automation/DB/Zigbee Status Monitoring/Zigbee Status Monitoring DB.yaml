@@ -1,7 +1,7 @@
 blueprint:
   name: "Zigbee Statusüberwachung DB"
   description: >
-    #### Version 05.04.2026-03 Autor: D.B.
+    #### Version 05.04.2026-04 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FZigbee%2520Status%2520Monitoring%2FZigbee%2520Status%2520Monitoring%2520DB.yaml)
 
@@ -14,7 +14,7 @@ blueprint:
 
     ---
 
-    Überwacht Zigbee-Geräte via 'last_seen'. Ein Gerät wird erst nach Ablauf der Online-Bestätigungszeit wieder als "Online" gewertet.
+    Überwacht Zigbee-Geräte via 'last_seen'. Prüfung erfolgt hardware-schonend einmal pro Minute.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/main/blueprints/automation/DB/Zigbee%20Status%20Monitoring/Zigbee%20Status%20Monitoring%20DB.yaml
   domain: automation
@@ -28,7 +28,6 @@ blueprint:
             - domain: sensor
     offline_threshold:
       name: "Offline Schwellenwert (Minuten)"
-      description: "Zeitüberschreitung, ab der ein Gerät als offline gilt (z.B. 60)."
       default: 60
       selector:
         number:
@@ -37,7 +36,7 @@ blueprint:
           unit_of_measurement: min
     online_confirmation:
       name: "Online Bestätigungszeit (Minuten)"
-      description: "Das Gerät muss einen Zeitstempel haben, der jünger als dieser Wert ist, um als 'wieder da' zu gelten."
+      description: "Zeitstempel muss jünger als dieser Wert sein, um als 'Online' zu gelten."
       default: 5
       selector:
         number:
@@ -74,9 +73,7 @@ mode: parallel
 
 trigger:
   - trigger: time_pattern
-    minutes: "/5"
-  - trigger: state
-    entity_id: !input monitored_entities
+    minutes: "/1" # Führt die Prüfung exakt jede Minute einmal aus
 
 action:
   - variables:
@@ -84,6 +81,7 @@ action:
       monitored: !input monitored_entities
       off_limit: !input offline_threshold
       on_confirm: !input online_confirmation
+      # Aktuellen Speicherstand nur einmal am Anfang laden
       current_options: "{{ state_attr(memory, 'options') or [] }}"
 
   - repeat:
@@ -94,7 +92,6 @@ action:
             device: "{{ state_attr(ent, 'friendly_name') | replace(' last_seen', '') | replace(' last seen', '') }}"
             last_seen_raw: "{{ states(ent) }}"
             
-            # Minuten seit der letzten Meldung
             diff: >
               {% if has_value(ent) and last_seen_raw not in ['unavailable', 'unknown'] %}
                 {{ (as_timestamp(now()) - as_timestamp(last_seen_raw)) / 60 }}
@@ -102,9 +99,6 @@ action:
                 9999
               {% endif %}
 
-            # Logik:
-            # Offline wenn diff > off_limit
-            # Online wenn diff < on_confirm (Bestätigung dass es wirklich aktuell ist)
             is_offline_now: "{{ diff | float > off_limit | float }}"
             is_confirmed_online: "{{ diff | float < on_confirm | float }}"
             is_in_memory: "{{ ent in current_options }}"
@@ -130,10 +124,10 @@ action:
                 - service: input_select.set_options
                   data:
                     entity_id: "{{ memory }}"
-                    options: "{{ (current_options + [ent]) | unique | reject('eq', 'Platzhalter') | list }}"
+                    options: "{{ (state_attr(memory, 'options') + [ent]) | unique | reject('eq', 'Platzhalter') | list }}"
                 - sequence: !input offline_actions
 
-            # WECHSEL ZU ONLINE (Nur wenn Zeitstempel "frisch" genug ist)
+            # WECHSEL ZU ONLINE
             - conditions:
                 - "{{ is_confirmed_online }}"
                 - "{{ is_in_memory }}"
@@ -142,6 +136,6 @@ action:
                   data:
                     entity_id: "{{ memory }}"
                     options: >
-                      {% set new_options = current_options | reject('eq', ent) | reject('eq', 'Platzhalter') | list %}
+                      {% set new_options = state_attr(memory, 'options') | reject('eq', ent) | reject('eq', 'Platzhalter') | list %}
                       {{ new_options if new_options | count > 0 else ['Platzhalter'] }}
                 - sequence: !input online_actions
