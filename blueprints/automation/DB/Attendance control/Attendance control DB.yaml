@@ -15,23 +15,29 @@ blueprint:
     
     ---
     
-    ### Version 05.04.2026-5
+    ### Version 06.04.2026-1
     **Autor: D.B.**
 
-    DE: Sequenzielle Aktions-Ausführung mit 1 Sekunde Verzögerung zwischen den Schritten.
+    DE: Sequenzielle Ausführung (1s Abstand) und direkte Zeiteingabe für die Nachtsperre.
     
-    EN: Sequential action execution with 1 second delay between steps.
+    EN: Sequential execution (1s delay) and direct time input for the night lock.
   domain: automation
   input:
     activity_sensors:
       name: "Sensoren - Sensors"
-      description: "DE: Sensoren für Anwesenheit.\n\nEN: Presence sensors."
+      description: >-
+        DE: Sensoren, die Anwesenheit anzeigen (BWM, Kontakte).
+        
+        EN: Sensors indicating presence (Motion, Contacts).
       selector:
         entity:
           multiple: true
     activity_states:
       name: "Zustände Aktiv - Active States"
-      description: "DE: Zustände für ANWESEND.\n\nEN: Active states."
+      description: >-
+        DE: Zustände, die als AKTIV gelten (z.B. on, motion).
+        
+        EN: States considered ACTIVE (e.g. on, motion).
       default: ["on", "motion", "occupied"]
       selector:
         select:
@@ -40,7 +46,10 @@ blueprint:
           options: ["on", "motion", "occupied", "home"]
     inactive_states:
       name: "Zustände Inaktiv - Inactive States"
-      description: "DE: Zustände für ABWESEND.\n\nEN: Inactive states."
+      description: >-
+        DE: Zustände, die als INAKTIV gelten (z.B. off, closed).
+        
+        EN: States considered INACTIVE (e.g. off, closed).
       default: ["off", "closed", "unavailable"]
       selector:
         select:
@@ -49,34 +58,49 @@ blueprint:
           options: ["off", "closed", "unavailable", "not_home"]
     presence_boolean:
       name: "Anwesenheits Status - Presence Status"
-      description: "DE: Der zentrale Status-Schalter.\n\nEN: Central status switch."
+      description: >-
+        DE: Der zentrale Helfer-Schalter (Input Boolean) für den aktuellen Status.
+        
+        EN: The central helper switch (input boolean) for the current status.
       selector:
         entity:
           filter:
             domain: input_boolean
     master_switch_presence:
       name: "Master: Anwesenheit - Master: Presence"
-      description: "DE: Automatik für Ankunft erlauben.\n\nEN: Allow auto-arriving."
+      description: >-
+        DE: Erlaubt das automatische Setzen auf 'Anwesend'.
+        
+        EN: Allows automatic setting to 'Present'.
       selector:
         entity:
           filter:
             domain: input_boolean
     master_switch_absence:
       name: "Master: Abwesenheit - Master: Absence"
-      description: "DE: Automatik für Verlassen erlauben.\n\nEN: Allow auto-leaving."
+      description: >-
+        DE: Erlaubt das automatische Setzen auf 'Abwesend'.
+        
+        EN: Allows automatic setting to 'Absent'.
       selector:
         entity:
           filter:
             domain: input_boolean
     manual_absence_triggers:
       name: "Sofort-Abwesend Auslöser - Instant Absence Triggers"
-      description: "DE: Liste von Tastern/Buttons.\n\nEN: List of triggers."
+      description: >-
+        DE: Liste von Objekten (Taster, Schalter, Buttons), die sofort reagieren.
+        
+        EN: List of entities (buttons, switches) that react immediately.
       selector:
         entity:
           multiple: true
     manual_absence_states:
       name: "Zustände für Sofort-Aus - States for Instant Absence"
-      description: "DE: Status für Auslösung.\n\nEN: Trigger states."
+      description: >-
+        DE: Zustände der Auslöser für eine Aktion (z.B. on, pressed).
+        
+        EN: Trigger states for action (e.g. on, pressed).
       default: ["on"]
       selector:
         select:
@@ -85,35 +109,48 @@ blueprint:
           options: ["on", "off", "pressed", "active"]
     absence_delay:
       name: "Wartezeit Abwesenheit - Absence Delay"
-      description: "DE: Verzögerung für die Automatik.\n\nEN: Delay for automation."
+      description: >-
+        DE: Zeit ohne Sensor-Aktivität bis zur automatischen Abwesenheit.
+        
+        EN: Time without sensor activity until automatic absence.
       default:
         minutes: 1
       selector:
         duration: {}
-    night_lock_start_helper:
+    night_lock_start:
       name: "Nachtsperre beginnt um - Night lock starts at"
-      description: "DE: Startzeit (Helfer).\n\nEN: Start time (helper)."
+      description: >-
+        DE: Uhrzeit, ab der kein automatisches Abwesend-Schalten erfolgt.
+        
+        EN: Time from which no automatic absence switching occurs.
+      default: "22:00:00"
       selector:
-        entity:
-          filter:
-            domain: input_datetime
-    night_lock_end_helper:
+        time: {}
+    night_lock_end:
       name: "Nachtsperre endet um - Night lock ends at"
-      description: "DE: Endzeit (Helfer).\n\nEN: End time (helper)."
+      description: >-
+        DE: Uhrzeit, ab der die Sperre wieder aufgehoben ist.
+        
+        EN: Time when the lock is lifted again.
+      default: "08:00:00"
       selector:
-        entity:
-          filter:
-            domain: input_datetime
+        time: {}
     presence_counter:
       name: "Aktivitäts Counter - Activity Counter"
-      description: "DE: Counter-Helfer auswählen.\n\nEN: Select counter."
+      description: >-
+        DE: Counter-Helfer, der die Sensor-Impulse zählt.
+        
+        EN: Counter helper that counts sensor triggers.
       selector:
         entity:
           filter:
             domain: counter
     counter_threshold:
       name: "Schwellenwert - Threshold"
-      description: "DE: Impulse für Anwesenheit.\n\nEN: Triggers needed."
+      description: >-
+        DE: Anzahl der nötigen Sensor-Impulse für ANWESEND.
+        
+        EN: Number of sensor triggers needed for PRESENT.
       default: 2
       selector:
         number:
@@ -121,7 +158,10 @@ blueprint:
           max: 10
     counter_reset_timeout:
       name: "Zeitfenster für Impulse - Counter Reset Timeout"
-      description: "DE: Zeit für Impulse (Minuten).\n\nEN: Time window (min)."
+      description: >-
+        DE: Zeitraum in Minuten für das Zählen der Impulse.
+        
+        EN: Period in minutes for counting triggers.
       default: 5
       selector:
         number:
@@ -130,19 +170,28 @@ blueprint:
           unit_of_measurement: "min"
     instant_absence_actions:
       name: "Aktionen Sofort-Abwesend - Instant Absence Actions"
-      description: "DE: Aktionen bei Buttondruck.\n\nEN: Instant actions."
+      description: >-
+        DE: Aktionen, die SOFORT bei Betätigung des Auslösers starten.
+        
+        EN: Actions that start IMMEDIATELY upon trigger activation.
       default: []
       selector:
         action: {}
     absence_actions:
       name: "Aktionen Abwesenheit - Absence Actions"
-      description: "DE: Aktionen beim Verlassen.\n\nEN: Actions on absence."
+      description: >-
+        DE: Aktionen beim Wechsel in den Status ABWESEND.
+        
+        EN: Actions executed when switching to ABSENT status.
       default: []
       selector:
         action: {}
     presence_actions:
       name: "Aktionen Anwesenheit - Presence Actions"
-      description: "DE: Aktionen bei Ankunft.\n\nEN: Actions on presence."
+      description: >-
+        DE: Aktionen beim Wechsel in den Status ANWESEND.
+        
+        EN: Actions executed when switching to PRESENT status.
       default: []
       selector:
         action: {}
@@ -155,8 +204,8 @@ variables:
   var_delay: !input absence_delay
   var_counter: !input presence_counter
   var_threshold: !input counter_threshold
-  var_lock_start_ent: !input night_lock_start_helper
-  var_lock_end_ent: !input night_lock_end_helper
+  var_lock_start: !input night_lock_start
+  var_lock_end: !input night_lock_end
   var_manual_ents: !input manual_absence_triggers
   var_manual_states: !input manual_absence_states
 
@@ -225,13 +274,12 @@ action:
               {% set s = var_delay.seconds | default(0) | int %}
               {% set wait = (h * 3600) + (m * 60) + s %}
               {% set time_ok = (as_timestamp(now()) - as_timestamp(last_ch)) >= (wait - 1) %}
-              {% set start = states(var_lock_start_ent) %}
-              {% set end = states(var_lock_end_ent) %}
+              
               {% set cur = now().strftime('%H:%M:%S') %}
-              {% if start < end %}
-                {% set locked = start <= cur <= end %}
+              {% if var_lock_start < var_lock_end %}
+                {% set locked = var_lock_start <= cur <= var_lock_end %}
               {% else %}
-                {% set locked = cur >= start or cur <= end %}
+                {% set locked = cur >= var_lock_start or cur <= var_lock_end %}
               {% endif %}
               {{ active and time_ok and not locked }}
         sequence:
