@@ -15,12 +15,12 @@ blueprint:
     
     ---
     
-    ### Version 05.04.2026-4
+    ### Version 05.04.2026-5
     **Autor: D.B.**
 
-    DE: Optimierte Aktions-Ausführung (Parallel-Modus) für Sofort-Auslöser und Sensoren.
+    DE: Sequenzielle Aktions-Ausführung mit 1 Sekunde Verzögerung zwischen den Schritten.
     
-    EN: Optimized action execution (parallel mode) for instant triggers and sensors.
+    EN: Sequential action execution with 1 second delay between steps.
   domain: automation
   input:
     activity_sensors:
@@ -183,31 +183,30 @@ action:
                   {% set recent = (as_timestamp(now()) - as_timestamp(last)) < 3 %}
                   {{ match or recent }}
         sequence:
-          - parallel:
-              # System-Status Änderungen
-              - sequence:
-                  - action: input_boolean.turn_off
-                    target:
-                      entity_id: !input presence_boolean
-                  - action: counter.reset
-                    target:
-                      entity_id: !input presence_counter
-                  - repeat:
-                      for_each: "{{ var_manual_ents }}"
-                      sequence:
-                        - if:
-                            - condition: template
-                              value_template: "{{ states(repeat.item) in var_manual_states }}"
-                          then:
-                            - action: homeassistant.turn_off
-                              target:
-                                entity_id: "{{ repeat.item }}"
-              # Benutzer-Aktionen
-              - sequence:
-                  - choose: []
-                    default: !input instant_absence_actions
-                  - choose: []
-                    default: !input absence_actions
+          - action: input_boolean.turn_off
+            target:
+              entity_id: !input presence_boolean
+          - delay: "00:00:01"
+          - action: counter.reset
+            target:
+              entity_id: !input presence_counter
+          - delay: "00:00:01"
+          - repeat:
+              for_each: "{{ var_manual_ents }}"
+              sequence:
+                - if:
+                    - condition: template
+                      value_template: "{{ states(repeat.item) in var_manual_states }}"
+                  then:
+                    - action: homeassistant.turn_off
+                      target:
+                        entity_id: "{{ repeat.item }}"
+          - delay: "00:00:01"
+          - choose: []
+            default: !input instant_absence_actions
+          - delay: "00:00:01"
+          - choose: []
+            default: !input absence_actions
 
       # --- FALL 2: AUTOMATISCH ABWESEND ---
       - conditions:
@@ -236,17 +235,16 @@ action:
               {% endif %}
               {{ active and time_ok and not locked }}
         sequence:
-          - parallel:
-              - sequence:
-                  - action: input_boolean.turn_off
-                    target:
-                      entity_id: !input presence_boolean
-                  - action: counter.reset
-                    target:
-                      entity_id: !input presence_counter
-              - sequence:
-                  - choose: []
-                    default: !input absence_actions
+          - action: input_boolean.turn_off
+            target:
+              entity_id: !input presence_boolean
+          - delay: "00:00:01"
+          - action: counter.reset
+            target:
+              entity_id: !input presence_counter
+          - delay: "00:00:01"
+          - choose: []
+            default: !input absence_actions
 
       # --- FALL 3: ANWESEND WERDEN ---
       - conditions:
@@ -267,17 +265,16 @@ action:
               - condition: template
                 value_template: "{{ states(var_counter) | int >= (var_threshold | int) }}"
             then:
-              - parallel:
-                  - sequence:
-                      - action: input_boolean.turn_on
-                        target:
-                          entity_id: !input presence_boolean
-                      - action: counter.reset
-                        target:
-                          entity_id: !input presence_counter
-                  - sequence:
-                      - choose: []
-                        default: !input presence_actions
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: !input presence_boolean
+              - delay: "00:00:01"
+              - action: counter.reset
+                target:
+                  entity_id: !input presence_counter
+              - delay: "00:00:01"
+              - choose: []
+                default: !input presence_actions
             else:
               - wait_for_trigger:
                   - platform: state
