@@ -1,0 +1,98 @@
+blueprint:
+  name: "Zigbee Offline Erkennung via last_seen"
+  description: >
+    Überwacht Zigbee Geräte basierend auf ihrem 'last_seen' Zeitstempel.
+    Das Gerät gilt als offline, wenn der Zeitstempel älter als X Minuten ist.
+  domain: automation
+  input:
+    monitored_entities:
+      name: "Zu überwachende last_seen Sensoren"
+      description: "Wähle die 'last_seen' Sensoren deiner Geräte aus (z.B. sensor.tannenbaum_last_seen)."
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: timestamp
+          multiple: true
+    offline_threshold:
+      name: "Offline Schwellenwert (Minuten)"
+      description: "Nach wie vielen Minuten Inaktivität soll das Gerät als offline gelten?"
+      default: 60
+      selector:
+        number:
+          min: 5
+          max: 1440
+          unit_of_measurement: min
+    memory_helper:
+      name: "Gedächtnis Helfer"
+      description: "Ein input_select Helper (Dropdown) zur Speicherung der aktuell defekten Geräte."
+      selector:
+        entity:
+          domain: input_select
+    offline_actions:
+      name: "Aktionen bei Offline"
+      default: []
+      selector:
+        action: {}
+    online_actions:
+      name: "Aktionen bei Online"
+      default: []
+      selector:
+        action: {}
+
+mode: parallel
+
+# Wir prüfen alle X Minuten, ob Geräte die Zeit überschritten haben
+trigger:
+  - trigger: time_pattern
+    minutes: "/5" # Prüft alle 5 Minuten
+  - trigger: state
+    entity_id: !input monitored_entities
+    id: "device_update"
+
+action:
+  - repeat:
+      for_each: !input monitored_entities
+      sequence:
+        - variables:
+            entity: "{{ repeat.item }}"
+            memory: !input memory_helper
+            threshold: !input offline_threshold
+            # Berechnung der Inaktivität in Minuten
+            last_seen: "{{ states(entity) }}"
+            minutes_ago: >
+              {% if has_value(entity) %}
+                {{ (as_timestamp(now()) - as_timestamp(states(entity))) / 60 }}
+              {% else %}
+                9999
+              {% endif %}
+            
+            is_offline: "{{ minutes_ago | float > threshold | float }}"
+            current_options: "{{ state_attr(memory, 'options') or [] }}"
+            is_in_memory: "{{ entity in current_options }}"
+            device_name: "{{ state_attr(entity, 'friendly_name') | replace(' last_seen', '') | replace(' Zeitstempel', '') }}"
+
+        - choose:
+            # FALL 1: Gerät ist zu alt UND noch nicht im Speicher (Wird Offline)
+            - conditions:
+                - "{{ is_offline }}"
+                - "{{ not is_in_memory }}"
+              sequence:
+                - service: input_select.set_options
+                  data:
+                    entity_id: "{{ memory }}"
+                    options: "{{ (current_options + [entity]) | unique | reject('eq', 'Platzhalter') | list }}"
+                - sequence: !input offline_actions
+
+            # FALL 2: Gerät hat sich gemeldet UND war vorher im Speicher (Wird Online)
+            - conditions:
+                - "{{ not is_offline }}"
+                - "{{ is_in_memory }}"
+              sequence:
+                - service: input_select.set_options
+                  data:
+                    entity_id: "{{ memory }}"
+                    options: >
+                      {% set new_options = current_options | reject('eq', entity) | reject('eq', 'Platzhalter') | list %}
+                      {{ new_options if new_options | count > 0 else ['Platzhalter'] }}
+                - sequence: !input online_actions
