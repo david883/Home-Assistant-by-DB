@@ -1,21 +1,13 @@
 blueprint:
   name: "Zigbee Statusüberwachung DB"
   description: >
-    #### Version 05.04.2026-06 Autor: D.B.
+    #### Version 05.04.2026-07 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FZigbee%2520Status%2520Monitoring%2FZigbee%2520Status%2520Monitoring%2520DB.yaml)
 
     ---
 
-    #### Dir gefällt meine Arbeit? 
-    #### Lade mich doch auf einen Kaffee oder ein kühles Getränk ein. Ich freue mich über jede kleine Unterstützung!
-
-    [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
-
-    ---
-
-    Überwacht Zigbee-Geräte via 'last_seen'. Die Prüfung erfolgt hardware-schonend einmal pro Minute. 
-    Variable `{{ count }}` steht in den Aktionen für die Anzahl der überwachten Geräte zur Verfügung.
+    Überwacht Zigbee-Geräte via 'last_seen'. Schreibt die Anzahl der überwachten Geräte in einen Helfer für das Dashboard.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/main/blueprints/automation/DB/Zigbee%20Status%20Monitoring/Zigbee%20Status%20Monitoring%20DB.yaml
   domain: automation
@@ -27,6 +19,12 @@ blueprint:
           multiple: true
           filter:
             - domain: sensor
+    counter_helper:
+      name: "Zähler Helfer (input_number)"
+      description: "Wähle den input_number Helfer für die Gesamtzahl."
+      selector:
+        entity:
+          domain: input_number
     offline_threshold:
       name: "Offline Schwellenwert (Minuten)"
       default: 60
@@ -37,7 +35,6 @@ blueprint:
           unit_of_measurement: min
     online_confirmation:
       name: "Online Bestätigungszeit (Minuten)"
-      description: "Gerät gilt erst als 'Online', wenn der Zeitstempel jünger als dieser Wert ist."
       default: 5
       selector:
         number:
@@ -51,22 +48,12 @@ blueprint:
           domain: input_select
     offline_actions:
       name: "Aktionen bei Offline"
-      default:
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.benachrichtigung_zum_verarbeiten
-          data:
-            value: "David: {{ device }} ist offline. Andere: {{ list }}. (Überwacht: {{ count }})"
+      default: []
       selector:
         action: {}
     online_actions:
       name: "Aktionen bei Online"
-      default:
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.benachrichtigung_zum_verarbeiten
-          data:
-            value: "David: {{ device }} ist wieder online. Noch offline: {{ list }}. (Überwacht: {{ count }})"
+      default: []
       selector:
         action: {}
 
@@ -82,8 +69,14 @@ action:
       monitored: !input monitored_entities
       off_limit: !input offline_threshold
       on_confirm: !input online_confirmation
-      # Der Counter wird hier für die gesamte Automation festgelegt
-      count: "{{ monitored | count }}"
+      count_entity: !input counter_helper
+
+  # Aktualisiere den Helfer mit der Anzahl
+  - service: input_number.set_value
+    target:
+      entity_id: "{{ count_entity }}"
+    data:
+      value: "{{ monitored | count }}"
 
   - repeat:
       for_each: "{{ monitored }}"
@@ -92,19 +85,15 @@ action:
             ent: "{{ repeat.item }}"
             device: "{{ state_attr(ent, 'friendly_name') | replace(' last_seen', '') | replace(' last seen', '') }}"
             last_seen_raw: "{{ states(ent) }}"
-            
             diff: >
               {% if has_value(ent) and last_seen_raw not in ['unavailable', 'unknown'] %}
                 {{ (as_timestamp(now()) - as_timestamp(last_seen_raw)) / 60 }}
               {% else %}
                 9999
               {% endif %}
-
             is_offline_now: "{{ diff | float > off_limit | float }}"
             is_confirmed_online: "{{ diff | float < on_confirm | float }}"
             is_in_memory: "{{ ent in (state_attr(memory, 'options') or []) }}"
-
-            # Liste der anderen offline Geräte
             list: >
               {% set names = namespace(items=[]) %}
               {% for item in monitored %}
@@ -117,7 +106,6 @@ action:
               {{ names.items | join(', ') if names.items | count > 0 else 'keine' }}
 
         - choose:
-            # GEHT OFFLINE
             - conditions:
                 - "{{ is_offline_now }}"
                 - "{{ not is_in_memory }}"
@@ -127,8 +115,6 @@ action:
                     entity_id: "{{ memory }}"
                     options: "{{ (state_attr(memory, 'options') + [ent]) | unique | reject('eq', 'Platzhalter') | list }}"
                 - sequence: !input offline_actions
-
-            # GEHT ONLINE
             - conditions:
                 - "{{ is_confirmed_online }}"
                 - "{{ is_in_memory }}"
