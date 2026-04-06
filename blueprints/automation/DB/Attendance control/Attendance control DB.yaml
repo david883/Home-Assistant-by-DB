@@ -15,12 +15,12 @@ blueprint:
     
     ---
     
-    ### Version 06.04.2026-5
+    ### Version 06.04.2026-7
     **Autor: D.B.**
 
-    DE: Stabiler Fix für den Dictionary-Fehler. Master-Schalter und Nachtsperre direkt integriert.
+    DE: Maximale Zuverlässigkeit für Aktionen durch parallele Ausführung und Fehler-Toleranz.
     
-    EN: Stable fix for the dictionary error. Master switches and night lock integrated directly.
+    EN: Maximum reliability for actions through parallel execution and error tolerance.
   domain: automation
   input:
     activity_sensors:
@@ -31,43 +31,41 @@ blueprint:
           multiple: true
     activity_states:
       name: "Zustände Aktiv - Active States"
+      description: "DE: Zustände für ANWESEND.\n\nEN: Active states."
       default: ["on", "motion", "occupied"]
       selector:
         select:
           multiple: true
           custom_value: true
           options: ["on", "motion", "occupied", "home"]
-    inactive_states:
-      name: "Zustände Inaktiv - Inactive States"
-      default: ["off", "closed", "unavailable"]
-      selector:
-        select:
-          multiple: true
-          custom_value: true
-          options: ["off", "closed", "unavailable", "not_home"]
     presence_boolean:
       name: "Anwesenheits Status - Presence Status"
+      description: "DE: Der zentrale Status-Schalter.\n\nEN: Central status switch."
       selector:
         entity:
           filter:
             domain: input_boolean
     master_presence_enabled:
       name: "Master: Anwesenheit aktivieren - Master: Presence enabled"
+      description: "DE: Automatik für Kommen erlauben.\n\nEN: Allow auto-arriving."
       default: true
       selector:
         boolean: {}
     master_absence_enabled:
       name: "Master: Abwesenheit aktivieren - Master: Absence enabled"
+      description: "DE: Automatik für Verlassen erlauben.\n\nEN: Allow auto-leaving."
       default: true
       selector:
         boolean: {}
     manual_absence_triggers:
       name: "Sofort-Abwesend Auslöser - Instant Absence Triggers"
+      description: "DE: Liste von Tastern/Buttons.\n\nEN: List of triggers."
       selector:
         entity:
           multiple: true
     manual_absence_states:
       name: "Zustände für Sofort-Aus - States for Instant Absence"
+      description: "DE: Status für Auslösung.\n\nEN: Trigger states."
       default: ["on"]
       selector:
         select:
@@ -76,28 +74,33 @@ blueprint:
           options: ["on", "off", "pressed", "active"]
     absence_delay:
       name: "Wartezeit Abwesenheit - Absence Delay"
+      description: "DE: Verzögerung für die Automatik.\n\nEN: Delay for automation."
       default:
         minutes: 1
       selector:
         duration: {}
     night_lock_start:
       name: "Nachtsperre beginnt um - Night lock starts at"
+      description: "DE: Startzeit (direkte Eingabe).\n\nEN: Start time (direct input)."
       default: "22:00:00"
       selector:
         time: {}
     night_lock_end:
       name: "Nachtsperre endet um - Night lock ends at"
+      description: "DE: Endzeit (direkte Eingabe).\n\nEN: End time (direct input)."
       default: "08:00:00"
       selector:
         time: {}
     presence_counter:
       name: "Aktivitäts Counter - Activity Counter"
+      description: "DE: Counter-Helfer auswählen.\n\nEN: Select counter."
       selector:
         entity:
           filter:
             domain: counter
     counter_threshold:
       name: "Schwellenwert - Threshold"
+      description: "DE: Impulse für Anwesenheit.\n\nEN: Triggers needed."
       default: 2
       selector:
         number:
@@ -105,6 +108,7 @@ blueprint:
           max: 10
     counter_reset_timeout:
       name: "Zeitfenster für Impulse - Counter Reset Timeout"
+      description: "DE: Zeit für Impulse (Minuten).\n\nEN: Time window (min)."
       default: 5
       selector:
         number:
@@ -113,21 +117,25 @@ blueprint:
           unit_of_measurement: "min"
     instant_absence_actions:
       name: "Aktionen Sofort-Abwesend - Instant Absence Actions"
+      description: "DE: Aktionen bei Buttondruck.\n\nEN: Instant actions."
       default: []
       selector:
         action: {}
     absence_actions:
       name: "Aktionen Abwesenheit - Absence Actions"
+      description: "DE: Aktionen beim Verlassen.\n\nEN: Actions on absence."
       default: []
       selector:
         action: {}
     presence_actions:
       name: "Aktionen Anwesenheit - Presence Actions"
+      description: "DE: Aktionen bei Ankunft.\n\nEN: Actions on presence."
       default: []
       selector:
         action: {}
 
-mode: restart
+mode: parallel
+max: 10
 
 variables:
   var_sensors: !input activity_sensors
@@ -141,6 +149,7 @@ variables:
   var_master_absence: !input master_absence_enabled
   var_manual_ents: !input manual_absence_triggers
   var_manual_states: !input manual_absence_states
+  var_reset_min: !input counter_reset_timeout
 
 trigger:
   - platform: state
@@ -168,11 +177,9 @@ action:
           - action: input_boolean.turn_off
             target:
               entity_id: !input presence_boolean
-          - delay: "00:00:01"
           - action: counter.reset
             target:
               entity_id: !input presence_counter
-          - delay: "00:00:01"
           - repeat:
               for_each: "{{ var_manual_ents }}"
               sequence:
@@ -184,6 +191,12 @@ action:
                       target:
                         entity_id: "{{ repeat.item }}"
           - delay: "00:00:01"
+          - action: automation.trigger # Führt die Aktionen asynchron aus, um Blockaden zu vermeiden
+            continue_on_error: true
+            target:
+              entity_id: "{{ this.entity_id }}"
+            data:
+              skip_condition: true
           - choose: []
             default: !input instant_absence_actions
           - delay: "00:00:01"
@@ -217,7 +230,6 @@ action:
           - action: input_boolean.turn_off
             target:
               entity_id: !input presence_boolean
-          - delay: "00:00:01"
           - action: counter.reset
             target:
               entity_id: !input presence_counter
@@ -227,43 +239,40 @@ action:
 
       # --- FALL 3: ANWESEND WERDEN ---
       - conditions:
-          - condition: state
-            entity_id: !input presence_boolean
-            state: "off"
           - condition: template
             value_template: "{{ var_master_presence }}"
           - condition: template
             value_template: >
-              {{ expand(var_sensors) | selectattr('state', 'in', var_states_active) | list | count > 0 }}
+              {{ expand(var_sensors) | selectattr('state', 'in', var_states_active) | list | count > 0 or states(var_counter)|int > 0 }}
         sequence:
-          - action: counter.increment
-            target:
-              entity_id: !input presence_counter
           - if:
               - condition: template
-                value_template: "{{ states(var_counter) | int >= (var_threshold | int) }}"
+                value_template: >
+                  {% set last_ch = expand(var_sensors) | map(attribute='last_changed') | max %}
+                  {% set diff = (as_timestamp(now()) - as_timestamp(last_ch)) / 60 %}
+                  {{ diff > var_reset_min and states(var_counter)|int > 0 }}
             then:
-              - action: input_boolean.turn_on
-                target:
-                  entity_id: !input presence_boolean
-              - delay: "00:00:01"
               - action: counter.reset
                 target:
                   entity_id: !input presence_counter
-              - delay: "00:00:01"
-              - choose: []
-                default: !input presence_actions
             else:
-              - wait_for_trigger:
-                  - platform: state
-                    entity_id: !input activity_sensors
-                timeout:
-                  minutes: !input counter_reset_timeout
-                continue_on_timeout: true
               - if:
                   - condition: template
-                    value_template: "{{ wait.trigger == none }}"
+                    value_template: "{{ trigger.entity_id in var_sensors and states(trigger.entity_id) in var_states_active }}"
                 then:
+                  - action: counter.increment
+                    target:
+                      entity_id: !input presence_counter
+              - if:
+                  - condition: template
+                    value_template: "{{ states(var_counter) | int >= (var_threshold | int) and states(presence_boolean) == 'off' }}"
+                then:
+                  - action: input_boolean.turn_on
+                    target:
+                      entity_id: !input presence_boolean
                   - action: counter.reset
                     target:
                       entity_id: !input presence_counter
+                  - delay: "00:00:01"
+                  - choose: []
+                    default: !input presence_actions
