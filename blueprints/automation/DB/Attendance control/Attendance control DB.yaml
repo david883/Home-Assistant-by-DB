@@ -15,12 +15,12 @@ blueprint:
     
     ---
     
-    ### Version 06.04.2026-3
+    ### Version 06.04.2026-4
     **Autor: D.B.**
 
-    DE: Fix für multiple Aktionen. Alle hinterlegten Aktionen werden nun zuverlässig nacheinander mit 1s Abstand ausgeführt.
+    DE: Stabiler Fix für multiple Aktionen. Unterstützt komplexe Aktions-Listen ohne "Malformed Message" Fehler.
     
-    EN: Fix for multiple actions. All stored actions are now reliably executed one after another with 1s delay.
+    EN: Stable fix for multiple actions. Supports complex action lists without "Malformed Message" errors.
   domain: automation
   input:
     activity_sensors:
@@ -142,6 +142,14 @@ variables:
   var_manual_ents: !input manual_absence_triggers
   var_manual_states: !input manual_absence_states
 
+trigger:
+  - platform: state
+    entity_id: !input activity_sensors
+  - platform: state
+    entity_id: !input manual_absence_triggers
+  - platform: time_pattern
+    minutes: "/1"
+
 action:
   - choose:
       # --- FALL 1: SOFORT-AUSLÖSER ---
@@ -176,18 +184,11 @@ action:
                       target:
                         entity_id: "{{ repeat.item }}"
           - delay: "00:00:01"
-          - repeat:
-              for_each: !input instant_absence_actions
-              sequence:
-                - choose: []
-                  default: "{{ repeat.item }}"
-                - delay: "00:00:01"
-          - repeat:
-              for_each: !input absence_actions
-              sequence:
-                - choose: []
-                  default: "{{ repeat.item }}"
-                - delay: "00:00:01"
+          - choose: []
+            default: !input instant_absence_actions
+          - delay: "00:00:01"
+          - choose: []
+            default: !input absence_actions
 
       # --- FALL 2: AUTOMATISCH ABWESEND ---
       - conditions:
@@ -221,12 +222,8 @@ action:
             target:
               entity_id: !input presence_counter
           - delay: "00:00:01"
-          - repeat:
-              for_each: !input absence_actions
-              sequence:
-                - choose: []
-                  default: "{{ repeat.item }}"
-                - delay: "00:00:01"
+          - choose: []
+            default: !input absence_actions
 
       # --- FALL 3: ANWESEND WERDEN ---
       - conditions:
@@ -254,12 +251,8 @@ action:
                 target:
                   entity_id: !input presence_counter
               - delay: "00:00:01"
-              - repeat:
-                  for_each: !input presence_actions
-                  sequence:
-                    - choose: []
-                      default: "{{ repeat.item }}"
-                    - delay: "00:00:01"
+              - choose: []
+                default: !input presence_actions
             else:
               - wait_for_trigger:
                   - platform: state
@@ -274,11 +267,3 @@ action:
                   - action: counter.reset
                     target:
                       entity_id: !input presence_counter
-
-trigger:
-  - platform: state
-    entity_id: !input activity_sensors
-  - platform: state
-    entity_id: !input manual_absence_triggers
-  - platform: time_pattern
-    minutes: "/1"
