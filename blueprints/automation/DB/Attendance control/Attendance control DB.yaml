@@ -15,12 +15,12 @@ blueprint:
     
     ---
     
-    ### Version 06.04.2026-4
+    ### Version 06.04.2026-5
     **Autor: D.B.**
 
-    DE: Stabiler Fix für multiple Aktionen. Unterstützt komplexe Aktions-Listen ohne "Malformed Message" Fehler.
+    DE: Stabiler Fix für den Dictionary-Fehler. Master-Schalter und Nachtsperre direkt integriert.
     
-    EN: Stable fix for multiple actions. Supports complex action lists without "Malformed Message" errors.
+    EN: Stable fix for the dictionary error. Master switches and night lock integrated directly.
   domain: automation
   input:
     activity_sensors:
