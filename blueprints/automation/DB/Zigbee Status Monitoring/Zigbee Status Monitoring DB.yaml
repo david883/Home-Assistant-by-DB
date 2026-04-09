@@ -1,46 +1,51 @@
 blueprint:
   name: "Zigbee Statusüberwachung DB"
   description: >
-    #### Version 09.04.2026-08 Autor: D.B.
+    #### Version 09.04.2026-09 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FZigbee%2520Status%2520Monitoring%2FZigbee%2520Status%2520Monitoring%2520DB.yaml)
 
     ---
 
-    #### Dir gefällt meine Arbeit? / Do you like my work? 
+    #### Dir gefällt meine Arbeit? 
     [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
 
     ---
 
-    ### 📖 Dokumentation / Documentation
-    | Variable | Beschreibung (DE) | Description (EN) |
-    | :--- | :--- | :--- |
-    | `{{ device }}` | Name des betroffenen Geräts. | Name of the affected device. |
-    | `{{ list }}` | Andere Offline-Geräte (max. 3 Namen). | Other offline devices (max 3). |
-    | `{{ count }}` | Gesamtzahl der überwachten Geräte. | Total number of monitored devices. |
-    | `{{ threshold }}` | Offline Schwellenwert in Minuten. | Offline threshold in minutes. |
-    | `{{ minutes_since }}` | Minuten seit der letzten Meldung. | Minutes since last seen. |
+    Dieser Blueprint ermöglicht eine intelligente Überwachung von Zigbee2Mqtt Entitäten auf ihre Erreichbarkeit. (Bitte beachten das last_seen überwacht wird. Muss in Zigbee2mqtt eingeschaltet werden) Im Gegensatz zu einfachen Automatisierungen nutzt dieses Script ein erweitertes Gedächtnis (Input Select), um den Status mehrerer Geräte gleichzeitig zu verwalten und dynamische Listen der aktuell nicht erreichbaren Geräte zu erstellen.
+
+    **Kernfunktionen:**
+    * **Intelligentes Gedächtnis:** Nutzt einen input_select Helfer, um den Überblick über alle Offline-Geräte zu behalten.
+    * **Dynamische Listen:** In den Benachrichtigungen wird automatisch aufgelistet, welche anderen Geräte ebenfalls gerade offline sind.
+    * **Verzögerungsfilter:** Einstellbare Wartezeiten für Online- und Offline-Events, um Fehlalarme bei kurzen Verbindungsabbrüchen zu vermeiden.
+
+    **Folgende Variablen können in den Actions z.B. bei Texten genutzt werden:**
+    * `{{ device }}` | Name des betroffenen Geräts.
+    * `{{ list }}` | Andere Offline-Geräte (max. 3 Namen).
+    * `{{ count }}` | Gesamtzahl der überwachten Geräte.
+    * `{{ threshold }}` | Offline Schwellenwert in Minuten.
+    * `{{ minutes_since }}` | Minuten seit der letzten Meldung.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/main/blueprints/automation/DB/Zigbee%20Status%20Monitoring/Zigbee%20Status%20Monitoring%20DB.yaml
   domain: automation
   input:
     monitored_entities:
-      name: "Zu überwachende Entitäten / Monitored entities"
-      description: "Wähle die last_seen Sensoren aus. / Select last_seen sensors."
+      name: "Zu überwachende Entitäten"
+      description: "Wähle die last_seen Sensoren der Geräte aus die überwacht werden sollen."
       selector:
         entity:
           multiple: true
           filter:
             - domain: sensor
     counter_helper:
-      name: "Zähler Helfer / Counter helper"
-      description: "Input_number für die Gesamtzahl. / Input_number for total count."
+      name: "Zähler Helfer"
+      description: "Input_number Helfer der genutzt wird für die Gesamtzahl der überwachten Zigbee Geräte."
       selector:
         entity:
           domain: input_number
     offline_threshold:
-      name: "Offline Schwellenwert / Offline threshold"
-      description: "Minuten bis Offline-Status. / Minutes until offline status."
+      name: "Offline Schwellenwert"
+      description: "Anzahl der Minuten bis Geräte als Offline gelten."
       default: 60
       selector:
         number:
@@ -48,8 +53,8 @@ blueprint:
           max: 1440
           unit_of_measurement: min
     online_confirmation:
-      name: "Online Bestätigungszeit / Online confirmation"
-      description: "Zeitfenster für Wiedererreichbarkeit. / Time window for availability."
+      name: "Online Bestätigungszeit"
+      description: "Anzahl an Minuten bis Geräte wieder als Online gelten."
       default: 5
       selector:
         number:
@@ -57,14 +62,14 @@ blueprint:
           max: 60
           unit_of_measurement: min
     memory_helper:
-      name: "Gedächtnis Helfer / Memory Helper"
-      description: "Input_select für den Speicher. / Input_select for memory."
+      name: "Gedächtnis Helfer"
+      description: "Input_select Helfer (Dropdown Helfer) in dem die Geräte als offline gespeichert wurden."
       selector:
         entity:
           domain: input_select
     offline_actions:
-      name: "Aktionen bei Offline / Offline Actions"
-      description: "Aktionen, wenn ein Gerät offline geht. / Actions when device goes offline."
+      name: "Aktionen bei Offline"
+      description: "Aktionen, wenn ein Gerät offline geht. Hier kann z.B. ein Text über Push versendet werden. Die oben erwähnten Variablen sind hier nutzbar!"
       default:
         - service: input_text.set_value
           target:
@@ -74,8 +79,8 @@ blueprint:
       selector:
         action: {}
     online_actions:
-      name: "Aktionen bei Online / Online Actions"
-      description: "Aktionen, wenn ein Gerät wieder online ist. / Actions when device is online again."
+      name: "Aktionen bei Online"
+      description: "Aktionen, wenn ein Gerät wieder online geht. Hier kann z.B. ein Text über Push versendet werden. Die oben erwähnten Variablen sind hier nutzbar!"
       default:
         - service: input_text.set_value
           target:
@@ -129,11 +134,10 @@ action:
                 {% endfor %}
                 {{ names.items | join(', ') }}{% if total_off > 3 %} ... (+{{ total_off - 3 }} weitere){% endif %}
               {% else %}
-                keine / none
+                keine
               {% endif %}
 
         - choose:
-            # CASE: DEVICE GOES OFFLINE
             - conditions:
                 - "{{ is_offline_now }}"
                 - "{{ not is_in_memory }}"
@@ -144,13 +148,11 @@ action:
                     options: "{{ (state_attr(memory, 'options') + [ent]) | unique | reject('eq', 'Platzhalter') | list }}"
                 - sequence: !input offline_actions
 
-            # CASE: DEVICE COMES BACK ONLINE
             - conditions:
                 - "{{ is_confirmed_online }}"
                 - "{{ is_in_memory }}"
               sequence:
                 - variables:
-                    # Wir berechnen die neuen Optionen und stellen sicher, dass Platzhalter immer dabei ist, falls die Liste leer würde
                     new_opts: >
                       {% set remaining = state_attr(memory, 'options') | reject('eq', ent) | reject('eq', 'Platzhalter') | list %}
                       {{ remaining if remaining | count > 0 else ['Platzhalter'] }}
@@ -158,7 +160,6 @@ action:
                   data:
                     entity_id: "{{ memory }}"
                     options: "{{ new_opts }}"
-                # Jetzt erst selektieren, falls wir auf den Platzhalter zurückgefallen sind
                 - if:
                     - "{{ 'Platzhalter' in new_opts and new_opts | count == 1 }}"
                   then:
