@@ -1,10 +1,22 @@
 blueprint:
   name: "Zigbee Statusüberwachung DB"
   description: >
-    #### Version 09.04.2026-05 Autor: D.B.
-    ... (Rest wie gehabt) ...
+    #### Version 09.04.2026-06 Autor: D.B.
 
-  # (Inputs bleiben identisch wie in Version 09.04.2026-02)
+    #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FZigbee%2520Status%2520Monitoring%2FZigbee%2520Status%2520Monitoring%2520DB.yaml)
+
+    ---
+
+    ### 📖 Dokumentation / Documentation
+    | Variable | Beschreibung (DE) | Description (EN) |
+    | :--- | :--- | :--- |
+    | `{{ device }}` | Aktuelles Gerät. | Current device. |
+    | `{{ list }}` | Andere Offline-Geräte (max. 3 Namen). | Other offline devices (max 3). |
+    | `{{ count }}` | Gesamtzahl überwacht. | Total monitored. |
+
+    ---
+    **Info:** Diese Version optimiert das Log-Verhalten des input_select Helpers.
+
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/main/blueprints/automation/DB/Zigbee%20Status%20Monitoring/Zigbee%20Status%20Monitoring%20DB.yaml
   domain: automation
   input:
@@ -82,12 +94,10 @@ action:
             state_val: "{{ states(ent) }}"
             is_valid: "{{ has_value(ent) and state_val not in ['unavailable', 'unknown', 'none'] }}"
             minutes_since: "{{ (as_timestamp(now()) - as_timestamp(state_val)) / 60 if is_valid else 0 }}"
-            
             is_offline_now: "{{ is_valid and minutes_since | float > threshold | float }}"
             is_confirmed_online: "{{ is_valid and minutes_since | float < on_confirm | float }}"
             is_in_memory: "{{ ent in (state_attr(memory, 'options') or []) }}"
 
-            # GEKÜRZTE LISTE (max 3 Namen, dann Anzahl), um 255 Zeichen Limit zu wahren
             list: >
               {% set mem_list = state_attr(memory, 'options') | reject('eq', 'Platzhalter') | reject('eq', ent) | list %}
               {% set total_off = mem_list | count %}
@@ -102,6 +112,7 @@ action:
               {% endif %}
 
         - choose:
+            # GEHT OFFLINE
             - conditions:
                 - "{{ is_offline_now }}"
                 - "{{ not is_in_memory }}"
@@ -112,14 +123,22 @@ action:
                     options: "{{ (state_attr(memory, 'options') + [ent]) | unique | reject('eq', 'Platzhalter') | list }}"
                 - sequence: !input offline_actions
 
+            # GEHT ONLINE
             - conditions:
                 - "{{ is_confirmed_online }}"
                 - "{{ is_in_memory }}"
               sequence:
+                # TRICK: Erst Auswahl auf Platzhalter setzen, um Log-Fehler zu vermeiden
+                - service: input_select.select_option
+                  data:
+                    entity_id: "{{ memory }}"
+                    option: "Platzhalter"
+                - variables:
+                    new_opts: >
+                      {% set opts = state_attr(memory, 'options') | reject('eq', ent) | reject('eq', 'Platzhalter') | list %}
+                      {{ opts if opts | count > 0 else ['Platzhalter'] }}
                 - service: input_select.set_options
                   data:
                     entity_id: "{{ memory }}"
-                    options: >
-                      {% set opts = state_attr(memory, 'options') | reject('eq', ent) | reject('eq', 'Platzhalter') | list %}
-                      {{ opts if opts | count > 0 else ['Platzhalter'] }}
+                    options: "{{ new_opts }}"
                 - sequence: !input online_actions
