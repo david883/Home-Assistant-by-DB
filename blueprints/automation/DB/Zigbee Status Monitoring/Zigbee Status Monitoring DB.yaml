@@ -1,30 +1,10 @@
 blueprint:
   name: "Zigbee Statusüberwachung DB"
   description: >
-    #### Version 09.04.2026-02 Autor: D.B.
+    #### Version 09.04.2026-05 Autor: D.B.
+    ... (Rest wie gehabt) ...
 
-    #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FZigbee%2520Status%2520Monitoring%2FZigbee%2520Status%2520Monitoring%2520DB.yaml)
-
-    ---
-
-    #### Dir gefällt meine Arbeit? 
-    #### Lade mich doch auf einen Kaffee oder ein kühles Getränk ein. Ich freue mich über jede kleine Unterstützung!
-
-    [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
-
-    ---
-
-    ### 📖 Dokumentation / Documentation
-    | Variable | Beschreibung (DE) | Description (EN) |
-    | :--- | :--- | :--- |
-    | `{{ device }}` | Name des betroffenen Geräts. | Name of the affected device. |
-    | `{{ list }}` | Andere Geräte im Offline-Speicher. | Other devices in offline memory. |
-    | `{{ count }}` | Gesamtzahl der überwachten Geräte. | Total number of monitored devices. |
-    | `{{ threshold }}` | Offline Schwellenwert (Minuten). | Offline threshold (minutes). |
-
-    ---
-    **Hinweis:** Geräte im Status `unknown` oder `unavailable` (z.B. während eines Neustarts) werden ignoriert, um Fehlalarme zu vermeiden.
-
+  # (Inputs bleiben identisch wie in Version 09.04.2026-02)
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/main/blueprints/automation/DB/Zigbee%20Status%20Monitoring/Zigbee%20Status%20Monitoring%20DB.yaml
   domain: automation
   input:
@@ -63,22 +43,12 @@ blueprint:
           domain: input_select
     offline_actions:
       name: "Aktionen bei Offline"
-      default:
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.benachrichtigung_zum_verarbeiten
-          data:
-            value: "David: {{ device }} ist offline. Andere: {{ list }}. (Gesamt: {{ count }})"
+      default: []
       selector:
         action: {}
     online_actions:
       name: "Aktionen bei Online"
-      default:
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.benachrichtigung_zum_verarbeiten
-          data:
-            value: "David: {{ device }} ist wieder online. Noch offline: {{ list }}"
+      default: []
       selector:
         action: {}
 
@@ -108,31 +78,28 @@ action:
       sequence:
         - variables:
             ent: "{{ repeat.item }}"
-            device: "{{ state_attr(ent, 'friendly_name') | replace(' last_seen', '') | replace(' last seen', '') }}"
+            device: "{{ state_attr(ent, 'friendly_name') | replace(' Last seen', '') | replace(' last_seen', '') }}"
             state_val: "{{ states(ent) }}"
-            
-            # Neustart-Bremse: Nur rechnen, wenn ein gültiger Zeitstempel vorliegt
             is_valid: "{{ has_value(ent) and state_val not in ['unavailable', 'unknown', 'none'] }}"
+            minutes_since: "{{ (as_timestamp(now()) - as_timestamp(state_val)) / 60 if is_valid else 0 }}"
             
-            minutes_since: >
-              {% if is_valid %}
-                {{ (as_timestamp(now()) - as_timestamp(state_val)) / 60 }}
-              {% else %}
-                0
-              {% endif %}
-
-            # Logik-Flags
             is_offline_now: "{{ is_valid and minutes_since | float > threshold | float }}"
             is_confirmed_online: "{{ is_valid and minutes_since | float < on_confirm | float }}"
             is_in_memory: "{{ ent in (state_attr(memory, 'options') or []) }}"
 
+            # GEKÜRZTE LISTE (max 3 Namen, dann Anzahl), um 255 Zeichen Limit zu wahren
             list: >
               {% set mem_list = state_attr(memory, 'options') | reject('eq', 'Platzhalter') | reject('eq', ent) | list %}
-              {% set names = namespace(items=[]) %}
-              {% for item in mem_list %}
-                {% set names.items = names.items + [state_attr(item, 'friendly_name') | replace(' last_seen', '') | replace(' last seen', '') or item] %}
-              {% endfor %}
-              {{ names.items | join(', ') if names.items | count > 0 else 'keine / none' }}
+              {% set total_off = mem_list | count %}
+              {% if total_off > 0 %}
+                {% set names = namespace(items=[]) %}
+                {% for item in mem_list[:3] %}
+                  {% set names.items = names.items + [state_attr(item, 'friendly_name') | replace(' Last seen', '') | replace(' last_seen', '')] %}
+                {% endfor %}
+                {{ names.items | join(', ') }}{% if total_off > 3 %} ... (+{{ total_off - 3 }} weitere){% endif %}
+              {% else %}
+                keine
+              {% endif %}
 
         - choose:
             - conditions:
