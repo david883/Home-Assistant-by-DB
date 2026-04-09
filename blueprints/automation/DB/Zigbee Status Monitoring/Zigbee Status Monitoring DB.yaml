@@ -1,7 +1,7 @@
 blueprint:
   name: "Zigbee Statusüberwachung DB"
   description: >
-    #### Version 09.04.2026-07 Autor: D.B.
+    #### Version 09.04.2026-08 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FZigbee%2520Status%2520Monitoring%2FZigbee%2520Status%2520Monitoring%2520DB.yaml)
 
@@ -133,6 +133,7 @@ action:
               {% endif %}
 
         - choose:
+            # CASE: DEVICE GOES OFFLINE
             - conditions:
                 - "{{ is_offline_now }}"
                 - "{{ not is_in_memory }}"
@@ -143,20 +144,26 @@ action:
                     options: "{{ (state_attr(memory, 'options') + [ent]) | unique | reject('eq', 'Platzhalter') | list }}"
                 - sequence: !input offline_actions
 
+            # CASE: DEVICE COMES BACK ONLINE
             - conditions:
                 - "{{ is_confirmed_online }}"
                 - "{{ is_in_memory }}"
               sequence:
-                - service: input_select.select_option
-                  data:
-                    entity_id: "{{ memory }}"
-                    option: "Platzhalter"
                 - variables:
+                    # Wir berechnen die neuen Optionen und stellen sicher, dass Platzhalter immer dabei ist, falls die Liste leer würde
                     new_opts: >
-                      {% set opts = state_attr(memory, 'options') | reject('eq', ent) | reject('eq', 'Platzhalter') | list %}
-                      {{ opts if opts | count > 0 else ['Platzhalter'] }}
+                      {% set remaining = state_attr(memory, 'options') | reject('eq', ent) | reject('eq', 'Platzhalter') | list %}
+                      {{ remaining if remaining | count > 0 else ['Platzhalter'] }}
                 - service: input_select.set_options
                   data:
                     entity_id: "{{ memory }}"
                     options: "{{ new_opts }}"
+                # Jetzt erst selektieren, falls wir auf den Platzhalter zurückgefallen sind
+                - if:
+                    - "{{ 'Platzhalter' in new_opts and new_opts | count == 1 }}"
+                  then:
+                    - service: input_select.select_option
+                      data:
+                        entity_id: "{{ memory }}"
+                        option: "Platzhalter"
                 - sequence: !input online_actions
