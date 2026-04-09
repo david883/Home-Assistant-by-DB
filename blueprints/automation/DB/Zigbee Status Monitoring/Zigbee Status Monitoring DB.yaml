@@ -1,49 +1,37 @@
 blueprint:
   name: "Zigbee Statusüberwachung DB"
   description: >
-    #### Version 05.04.2026-08 Autor: D.B.
+    #### Version 09.04.2026-01 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FZigbee%2520Status%2520Monitoring%2FZigbee%2520Status%2520Monitoring%2520DB.yaml)
 
     ---
 
-    #### Dir gefällt meine Arbeit? 
-    #### Lade mich doch auf einen Kaffee oder ein kühles Getränk ein. Ich freue mich über jede kleine Unterstützung!
-
-    [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
-
-    ---
-
     ### 📖 Dokumentation / Documentation
-    Diese Variablen können in den Aktionen verwendet werden:
-    These variables can be used in the actions:
-
     | Variable | Beschreibung (DE) | Description (EN) |
     | :--- | :--- | :--- |
     | `{{ device }}` | Name des aktuell betroffenen Geräts. | Name of the currently affected device. |
-    | `{{ list }}` | Liste der anderen aktuell offline befindlichen Geräte. | List of other currently offline devices. |
-    | `{{ count }}` | Gesamtzahl der in diesem Blueprint überwachten Geräte. | Total number of devices monitored in this blueprint. |
-    | `{{ threshold }}` | Der eingestellte Schwellenwert für den Offline-Status. | The configured threshold for offline status. |
-    | `{{ minutes_since }}` | Zeit in Minuten seit der letzten Meldung des Geräts. | Time in minutes since the device's last report. |
+    | `{{ list }}` | Andere Geräte, die aktuell im Offline-Speicher sind. | Other devices currently in offline memory. |
+    | `{{ count }}` | Gesamtzahl der überwachten Geräte. | Total number of monitored devices. |
+    | `{{ threshold }}` | Offline Schwellenwert in Minuten. | Offline threshold in minutes. |
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/main/blueprints/automation/DB/Zigbee%20Status%20Monitoring/Zigbee%20Status%20Monitoring%20DB.yaml
   domain: automation
   input:
     monitored_entities:
-      name: "Zu überwachende last_seen Entitäten / Monitored entities"
+      name: "Zu überwachende last_seen Entitäten"
       selector:
         entity:
           multiple: true
           filter:
             - domain: sensor
     counter_helper:
-      name: "Zähler Helfer (input_number) / Counter helper"
-      description: "Speichert die Gesamtzahl der überwachten Geräte. / Stores the total count of monitored devices."
+      name: "Zähler Helfer (input_number)"
       selector:
         entity:
           domain: input_number
     offline_threshold:
-      name: "Offline Schwellenwert (Minuten) / Offline threshold"
+      name: "Offline Schwellenwert (Minuten)"
       default: 60
       selector:
         number:
@@ -51,8 +39,7 @@ blueprint:
           max: 1440
           unit_of_measurement: min
     online_confirmation:
-      name: "Online Bestätigungszeit (Minuten) / Online confirmation"
-      description: "Zeitfenster für die Wiedererreichbarkeit. / Time window for re-availability."
+      name: "Online Bestätigungszeit (Minuten)"
       default: 5
       selector:
         number:
@@ -65,23 +52,23 @@ blueprint:
         entity:
           domain: input_select
     offline_actions:
-      name: "Aktionen bei Offline / Offline Actions"
+      name: "Aktionen bei Offline"
       default:
         - service: input_text.set_value
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: Das Gerät {{ device }} ist seit über {{ threshold }} Minuten offline. Andere: {{ list }}. (Gesamt: {{ count }})"
+            value: "David: {{ device }} ist offline. Andere: {{ list }}. (Gesamt: {{ count }})"
       selector:
         action: {}
     online_actions:
-      name: "Aktionen bei Online / Online Actions"
+      name: "Aktionen bei Online"
       default:
         - service: input_text.set_value
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: Das Gerät {{ device }} ist wieder online. Noch offline: {{ list }}. (Überwacht: {{ count }})"
+            value: "David: {{ device }} ist wieder online. Noch offline: {{ list }}"
       selector:
         action: {}
 
@@ -100,7 +87,6 @@ action:
       count_entity: !input counter_helper
       count: "{{ monitored | count }}"
 
-  # Update des Dashboard-Zählers
   - service: input_number.set_value
     target:
       entity_id: "{{ count_entity }}"
@@ -126,19 +112,16 @@ action:
             is_confirmed_online: "{{ minutes_since | float < on_confirm | float }}"
             is_in_memory: "{{ ent in (state_attr(memory, 'options') or []) }}"
 
+            # VERBESSERTE LISTE: Liest direkt aus dem memory_helper
             list: >
+              {% set mem_list = state_attr(memory, 'options') | reject('eq', 'Platzhalter') | reject('eq', ent) | list %}
               {% set names = namespace(items=[]) %}
-              {% for item in monitored %}
-                {% set val = states(item) %}
-                {% set d = (as_timestamp(now()) - as_timestamp(val)) / 60 if has_value(item) and val not in ['unavailable', 'unknown'] else 9999 %}
-                {% if item != ent and d > threshold | float %}
-                  {% set names.items = names.items + [state_attr(item, 'friendly_name') | replace(' last_seen', '')] %}
-                {% endif %}
+              {% for item in mem_list %}
+                {% set names.items = names.items + [state_attr(item, 'friendly_name') | replace(' last_seen', '') | replace(' last seen', '') or item] %}
               {% endfor %}
               {{ names.items | join(', ') if names.items | count > 0 else 'keine / none' }}
 
         - choose:
-            # GEHT OFFLINE
             - conditions:
                 - "{{ is_offline_now }}"
                 - "{{ not is_in_memory }}"
@@ -149,15 +132,17 @@ action:
                     options: "{{ (state_attr(memory, 'options') + [ent]) | unique | reject('eq', 'Platzhalter') | list }}"
                 - sequence: !input offline_actions
 
-            # GEHT ONLINE
             - conditions:
                 - "{{ is_confirmed_online }}"
                 - "{{ is_in_memory }}"
               sequence:
+                # Wir berechnen die Optionen für das Online-Gehen neu
+                - variables:
+                    new_options: >
+                      {% set opts = state_attr(memory, 'options') | reject('eq', ent) | reject('eq', 'Platzhalter') | list %}
+                      {{ opts if opts | count > 0 else ['Platzhalter'] }}
                 - service: input_select.set_options
                   data:
                     entity_id: "{{ memory }}"
-                    options: >
-                      {% set new_options = state_attr(memory, 'options') | reject('eq', ent) | reject('eq', 'Platzhalter') | list %}
-                      {{ new_options if new_options | count > 0 else ['Platzhalter'] }}
+                    options: "{{ new_options }}"
                 - sequence: !input online_actions
