@@ -10,6 +10,7 @@ Willkommen in meiner Sammlung von Home Assistant Blueprints. Hier findest du Aut
 | :--- | :--- | :--- |
 | **Attendance Control** | Intelligente Steuerung des Anwesenheitsstatus basierend auf Sensordaten. | [Zum Projekt](https://github.com/david883/Home-Assistant-by-DB/tree/main/blueprints%2Fautomation%2FDB%2FAttendance%20control) |
 | **Universal Status Monitoring** | Universelle Überwachung von Entitäten auf Statusänderungen oder kritische Werte. | [Zum Projekt](https://github.com/david883/Home-Assistant-by-DB/tree/main/blueprints%2Fautomation%2FDB%2FUniversal%20status%20monitoring) |
+| **Zigbee Status Monitoring** | Spezielle Überwachung für Zigbee-Geräte auf Erreichbarkeit und Status. | [Zum Projekt](https://github.com/david883/Home-Assistant-by-DB/tree/main/blueprints%2Fautomation%2FDB%2FZigbee%20status%20monitoring) |
 
 ---
 
@@ -20,6 +21,9 @@ Dieser Blueprint hilft dir dabei, die **Anwesenheit in deinem Zuhause** intellig
 
 ### [Universal Status Monitoring](https://github.com/david883/Home-Assistant-by-DB/tree/main/blueprints%2Fautomation%2FDB%2FUniversal%20status%20monitoring)
 Ein vielseitiges Tool zur **Zustandsüberwachung**. Hiermit kannst du beliebige Entitäten überwachen und wirst sofort benachrichtigt, wenn ein definierter Zustand (z. B. "Offline", "Batterie schwach" oder "Fenster offen") eintritt.
+
+### [Zigbee Status Monitoring](https://github.com/david883/Home-Assistant-by-DB/tree/main/blueprints%2Fautomation%2FDB%2FZigbee%20status%20monitoring)
+Speziell für Zigbee-Netzwerke entwickelt: Dieser Blueprint überwacht deine **Zigbee-Geräte** und meldet sich, wenn Geräte die Verbindung verlieren (LQI/Verfügbarkeit) oder ungewöhnliche Zustände aufweisen. Ideal, um die Stabilität deines Mesh-Netzwerks im Blick zu behalten.
 
 ---
 
