@@ -48,17 +48,17 @@ Folgende Variablen können in den Aktionen (z.B. für Benachrichtigungen) verwen
 
 ## 📊 Dashboard Integration (Markdown)
 
-Du kannst diesen Code in einer Markdown-Karte nutzen, um den Status anzuzeigen:
+Du kannst diesen Code in einer Markdown-Karte nutzen, um den Status anzuzeigen. Vorher musst du hier statt DEIN HELFER natürlich deine Datenpunkte einfügen.
 
 ```yaml
 type: markdown
 content: >
-  {% set total = states('input_number.uberwachte_zigbee_gerate_batt') | int(0) %}
+  {% set total = states('input_number.DEIN_HELFER') | int(0) %}
   ### 🌐 Zigbee Netzwerk-Status
   **Überwachte Geräte gesamt:** {{ total }}
   ---
   {% set offline_options = state_attr('input_select.DEIN_HELFER', 'options') %}
-  {% set real_offline = offline_options | reject('eq', 'Platzhalter') | list %}
+  {% set real_offline = offline_options | reject('eq', 'Platzhalter') | list if offline_options is not none else [] %}
   {% if real_offline | count > 0 %}
     ⚠️ **Aktuell offline ({{ real_offline | count }}):**
     {% for ent in real_offline %}
