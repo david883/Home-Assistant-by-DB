@@ -1,7 +1,7 @@
 blueprint:
   name: "Zigbee Statusüberwachung DB"
   description: >
-    #### Version 09.04.2026-10 Autor: D.B.
+    #### Version 10.04.2026-01 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdavid883%2FHome-Assistant-by-DB%2Fblob%2Fmain%2Fblueprints%2Fautomation%2FDB%2FZigbee%2520Status%2520Monitoring%2FZigbee%2520Status%2520Monitoring%2520DB.yaml)
 
@@ -12,14 +12,16 @@ blueprint:
 
     ---
 
-    Dieser Blueprint ermöglicht eine intelligente Überwachung von Zigbee2Mqtt Entitäten auf ihre Erreichbarkeit. (Bitte beachten das last_seen überwacht wird. Muss in Zigbee2mqtt eingeschaltet werden) Im Gegensatz zu einfachen Automatisierungen nutzt dieses Script ein erweitertes Gedächtnis (Input Select), um den Status mehrerer Geräte gleichzeitig zu verwalten und dynamische Listen der aktuell nicht erreichbaren Geräte zu erstellen.
+    Dieser Blueprint ermöglicht eine intelligente Überwachung von Zigbee2Mqtt Entitäten auf ihre Erreichbarkeit. ( Bitte beachten das last_seen überwacht wird. Muss in Zigbee2mqtt eingeschaltet werden) Im Gegensatz zu einfachen Automatisierungen nutzt dieses Script ein erweitertes Gedächtnis (Input Select), um den Status mehrerer Geräte gleichzeitig zu verwalten und dynamische Listen der aktuell nicht erreichbaren Geräte zu erstellen.
 
     **Kernfunktionen:**
+
     * **Intelligentes Gedächtnis:** Nutzt einen input_select Helfer, um den Überblick über alle Offline-Geräte zu behalten.
     * **Dynamische Listen:** In den Benachrichtigungen wird automatisch aufgelistet, welche anderen Geräte ebenfalls gerade offline sind.
     * **Verzögerungsfilter:** Einstellbare Wartezeiten für Online- und Offline-Events, um Fehlalarme bei kurzen Verbindungsabbrüchen zu vermeiden.
 
-    **Folgende Variablen können in den Actions z.B. bei Texten genutzt werden:**
+    **Folgende Variablen können in den Actions z.b. bei Texten genutzt werden:**
+
     * `{{ device }}` | Name des betroffenen Geräts.
     * `{{ list }}` | Andere Offline-Geräte (max. 3 Namen).
     * `{{ count }}` | Gesamtzahl der überwachten Geräte.
@@ -69,7 +71,7 @@ blueprint:
           domain: input_select
     offline_actions:
       name: "Aktionen bei Offline"
-      description: "Aktionen, wenn ein Gerät offline geht. Hier kann z.B. ein Text über Push versendet werden. Die oben erwähnten Variablen sind hier nutzbar!"
+      description: "Aktionen, wenn ein Gerät offline geht. Hier kann z.b. ein Text über Push versendet werden. Die oben erwähnten Variablen sind hier nutzbar!"
       default:
         - service: input_text.set_value
           target:
@@ -80,7 +82,7 @@ blueprint:
         action: {}
     online_actions:
       name: "Aktionen bei Online"
-      description: "Aktionen, wenn ein Gerät wieder online geht. Hier kann z.B. ein Text über Push versendet werden. Die oben erwähnten Variablen sind hier nutzbar!"
+      description: "Aktionen, wenn ein Gerät wieder online geht. Hier kann z.b. ein Text über Push versendet werden. Die oben erwähnten Variablen sind hier nutzbar!"
       default:
         - service: input_text.set_value
           target:
@@ -138,7 +140,6 @@ action:
               {% endif %}
 
         - choose:
-            # GEHT OFFLINE
             - conditions:
                 - "{{ is_offline_now }}"
                 - "{{ not is_in_memory }}"
@@ -149,13 +150,11 @@ action:
                     options: "{{ (state_attr(memory, 'options') + [ent]) | unique | reject('eq', 'Platzhalter') | list }}"
                 - sequence: !input offline_actions
 
-            # GEHT ONLINE
             - conditions:
                 - "{{ is_confirmed_online }}"
                 - "{{ is_in_memory }}"
               sequence:
                 - variables:
-                    # Wir erzwingen, dass Platzhalter IMMER in den Optionen ist, während wir umschreiben
                     new_opts: >
                       {% set remaining = state_attr(memory, 'options') | reject('eq', ent) | list %}
                       {{ (remaining + ['Platzhalter']) | unique | list }}
