@@ -1,15 +1,30 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
-  description: "Version 11.04.2026-8 - Speichert Gesamtzahl automatisch im Attribut des Zählers."
+  description: >
+    #### Version 11.04.2026-8 Autor: D.B.
+
+    #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
+
+    ---
+
+    #### Dir gefällt meine Arbeit? Lade mich doch auf einen Kaffee ein! / Do you like my work? Buy me a coffee!
+
+    [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
+
+    ---
+
+    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als Gedächtnis und einen Zahlen-Helfer für die Statistik.
+
+  source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
   domain: automation
   input:
     monitored_entities:
-      name: "Zu überwachende Entitäten"
+      name: "Zu überwachende Entitäten / Entities to monitor"
       selector:
         entity:
           multiple: true
     offline_states:
-      name: "Offline Status-Wörter"
+      name: "Offline Status-Wörter / Offline States"
       default: [unavailable, unknown, not_home, offline, "off"]
       selector:
         select:
@@ -27,7 +42,7 @@ blueprint:
             - label: "not_home"
               value: "not_home"
     online_states:
-      name: "Online Status-Wörter"
+      name: "Online Status-Wörter / Online States"
       default: [available, home, online, "on"]
       selector:
         select:
@@ -43,37 +58,47 @@ blueprint:
             - label: "on"
               value: "on"
     offline_duration:
-      name: "Offline Wartezeit (Minuten)"
+      name: "Offline Wartezeit (Minuten) / Offline duration"
       default: 5
       selector:
         number:
           min: 0
           max: 60
     online_duration:
-      name: "Online Wartezeit (Minuten)"
+      name: "Online Wartezeit (Minuten) / Online duration"
       default: 2
       selector:
         number:
           min: 0
           max: 60
     memory_helper:
-      name: "Gedächtnis Helfer (input_select)"
+      name: "Gedächtnis Helfer / Memory Helper"
       selector:
         entity:
           domain: input_select
     counter_helper:
-      name: "Zähler Helfer (input_number)"
+      name: "Zähler Helfer / Counter Helper"
       selector:
         entity:
           domain: input_number
     offline_actions:
-      name: "Aktionen bei Offline"
-      default: []
+      name: "Aktionen bei Offline / Offline Actions"
+      default:
+        - service: input_text.set_value
+          target:
+            entity_id: input_text.benachrichtigung_zum_verarbeiten
+          data:
+            value: "David: {{ device }} ist seit {{ threshold }} Min. offline. Andere: {{ list }}. (Gesamt: {{ count }})"
       selector:
         action: {}
     online_actions:
-      name: "Aktionen bei Online"
-      default: []
+      name: "Aktionen bei Online / Online Actions"
+      default:
+        - service: input_text.set_value
+          target:
+            entity_id: input_text.benachrichtigung_zum_verarbeiten
+          data:
+            value: "David: {{ device }} ist wieder erreichbar. Andere offline: {{ list }}. (Gesamt: {{ count }})"
       selector:
         action: {}
 
@@ -104,8 +129,18 @@ action:
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
       current_options: "{{ state_attr(memory, 'options') or [] }}"
+      
+      list: >
+        {% set names = namespace(items=[]) %}
+        {% for ent in monitored %}
+          {% if ent != trigger_ent and states(ent) in off_states %}
+            {% set names.items = names.items + [state_attr(ent, 'friendly_name') or ent] %}
+          {% endif %}
+        {% endfor %}
+        {{ names.items | join(', ') if names.items | count > 0 else 'keine' }}
 
   - choose:
+      # OFFLINE
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -126,19 +161,13 @@ action:
             data:
               entity_id: "{{ memory }}"
               option: "{{ trigger_ent }}"
-          # Speichert Anzahl im Wert UND Liste in den Attributen
           - service: input_number.set_value
             data:
               entity_id: "{{ counter }}"
               value: "{{ count }}"
-          - stop: "Update Attribut"
-          - service: state.set
-            data:
-              entity_id: "{{ counter }}"
-              attributes:
-                monitored_entities: "{{ monitored }}"
           - sequence: !input offline_actions
 
+      # ONLINE
       - conditions:
           - condition: trigger
             id: "trigger_online"
