@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 11.04.2026-3 Autor: D.B.
+    #### Version 11.04.2026-4 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -15,8 +15,8 @@ blueprint:
 
     ---
 
-    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als erweitertes Gedächtnis. Finaler Fix für Logger-Warnungen durch statischen Platzhalter.
-    Monitors entities for state changes. Uses a dropdown as memory. Final fix for logger warnings.
+    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste als Gedächtnis und einen Zahlen-Helfer für die Statistik.
+    Monitors entities for state changes. Uses a dropdown as memory and a number helper for statistics.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
   domain: automation
@@ -78,10 +78,16 @@ blueprint:
           unit_of_measurement: min
     memory_helper:
       name: "Gedächtnis Helfer / Memory Helper"
-      description: "Wähle dein Dropdown 'input_select.offline_gedachtnis_status_monitoring_script'."
+      description: "Das Dropdown 'input_select.offline_gedachtnis_status_monitoring_script'."
       selector:
         entity:
           domain: input_select
+    counter_helper:
+      name: "Zähler Helfer / Counter Helper"
+      description: "Wähle einen Nummern-Helfer (input_number), der die Anzahl der offline Geräte anzeigt. / Select a number helper (input_number) to show the count of offline devices."
+      selector:
+        entity:
+          domain: input_number
     offline_actions:
       name: "Aktionen bei Offline / Offline Actions"
       default:
@@ -123,6 +129,7 @@ trigger:
 action:
   - variables:
       memory: !input memory_helper
+      counter: !input counter_helper
       monitored: !input monitored_entities
       off_states: !input offline_states
       trigger_ent: "{{ trigger.entity_id }}"
@@ -144,19 +151,16 @@ action:
             id: "trigger_offline"
           - "{{ trigger_ent not in (state_attr(memory, 'options') or []) }}"
         sequence:
-          # Erst Auswahl auf Platzhalter retten (falls das Gerät gerade gelöscht wurde)
           - service: input_select.select_option
             data:
               entity_id: "{{ memory }}"
               option: "Platzhalter"
-          # Dann Optionen setzen (Platzhalter bleibt IMMER drin)
           - service: input_select.set_options
             data:
               entity_id: "{{ memory }}"
               options: >
                 {% set current = state_attr(memory, 'options') or [] %}
                 {{ (current + [trigger_ent, 'Platzhalter']) | unique | list }}
-          # Dann das neue Gerät auswählen
           - service: input_select.select_option
             data:
               entity_id: "{{ memory }}"
@@ -169,16 +173,24 @@ action:
             id: "trigger_online"
           - "{{ trigger_ent in (state_attr(memory, 'options') or []) }}"
         sequence:
-          # Vor dem Löschen Auswahl auf Platzhalter setzen
           - service: input_select.select_option
             data:
               entity_id: "{{ memory }}"
               option: "Platzhalter"
-          # ID aus der Liste werfen, Platzhalter zwingend behalten
+          - variables:
+              new_options: >
+                {% set current = state_attr(memory, 'options') or [] %}
+                {{ (current | reject('eq', trigger_ent) | list + ['Platzhalter']) | unique | list }}
           - service: input_select.set_options
             data:
               entity_id: "{{ memory }}"
-              options: >
-                {% set current = state_attr(memory, 'options') or [] %}
-                {{ (current | reject('eq', trigger_ent) | list + ['Platzhalter']) | unique | list }}
+              options: "{{ new_options }}"
           - sequence: !input online_actions
+
+  # STATISTIK UPDATE: Zählt die echten Einträge im Dropdown (ohne Platzhalter)
+  - service: input_number.set_value
+    data:
+      entity_id: "{{ counter }}"
+      value: >
+        {% set final_list = state_attr(memory, 'options') | reject('eq', 'Platzhalter') | list %}
+        {{ final_list | count }}
