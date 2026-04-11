@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 11.04.2026-10 Autor: D.B.
+    #### Version 11.04.2026-10b Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -13,8 +13,8 @@ blueprint:
 
     ---
 
-    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als Gedächtnis und zwei Zahlen-Helfer für die Statistik (Aktuell Offline & Gesamt Überwacht).
-    Monitors entities for state changes. Uses a dropdown as memory and two number helpers for statistics (Current Offline & Total Monitored).
+    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als Gedächtnis und einen Zahlen-Helfer für die Gesamtzahl der überwachten Geräte.
+    Monitors entities for state changes. Uses a dropdown as memory and a number helper for the total number of monitored devices.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
   domain: automation
@@ -63,7 +63,7 @@ blueprint:
               value: "on"
     offline_duration:
       name: "Offline Wartezeit (Minuten) / Offline duration"
-      description: "Zeit, bis die Offline-Meldung erfolgt. / Time before the offline notification occurs."
+      description: "Zeit, bis die Offline-Meldung erfolgt. / Time before the offline notification."
       default: 5
       selector:
         number:
@@ -72,7 +72,7 @@ blueprint:
           unit_of_measurement: min
     online_duration:
       name: "Online Wartezeit (Minuten) / Online duration"
-      description: "Zeit, bis die Online-Meldung erfolgt. / Time before the online notification occurs."
+      description: "Zeit, bis die Online-Meldung erfolgt. / Time before the online notification."
       default: 2
       selector:
         number:
@@ -85,12 +85,6 @@ blueprint:
       selector:
         entity:
           domain: input_select
-    counter_helper_offline:
-      name: "Zähler: Aktuell Offline / Counter: Currently Offline"
-      description: "Nummern-Helfer (input_number) für die Anzahl der Geräte, die gerade offline sind."
-      selector:
-        entity:
-          domain: input_number
     counter_helper_total:
       name: "Zähler: Überwacht Gesamt / Counter: Total Monitored"
       description: "Nummern-Helfer (input_number) für die Gesamtzahl der im Blueprint gewählten Geräte."
@@ -104,7 +98,7 @@ blueprint:
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: {{ device }} ist seit {{ threshold }} Min. offline. Andere: {{ list }}. (Gesamt: {{ count }})"
+            value: "David: {{ device }} ist seit {{ threshold }} Min. offline. Andere: {{ list }}. (Gesamt Offline: {{ count }})"
       selector:
         action: {}
     online_actions:
@@ -114,17 +108,30 @@ blueprint:
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: {{ device }} ist wieder erreichbar. Andere offline: {{ list }}. (Gesamt: {{ count }})"
+            value: "David: {{ device }} ist wieder erreichbar. Andere offline: {{ list }}. (Gesamt Offline: {{ count }})"
       selector:
         action: {}
 
 mode: parallel
 max: 50
 
+trigger:
+  - trigger: state
+    entity_id: !input monitored_entities
+    for:
+      minutes: !input offline_duration
+    id: "trigger_offline"
+    to: !input offline_states
+  - trigger: state
+    entity_id: !input monitored_entities
+    for:
+      minutes: !input online_duration
+    id: "trigger_online"
+    to: !input online_states
+
 action:
   - variables:
       memory: !input memory_helper
-      counter_off: !input counter_helper_offline
       counter_total: !input counter_helper_total
       monitored: !input monitored_entities
       off_states: !input offline_states
@@ -171,10 +178,6 @@ action:
             data:
               entity_id: "{{ memory }}"
               option: "{{ trigger_ent }}"
-          - service: input_number.set_value
-            data:
-              entity_id: "{{ counter_off }}"
-              value: "{{ count }}"
           - sequence: !input offline_actions
 
       # ONLINE
@@ -194,8 +197,4 @@ action:
             data:
               entity_id: "{{ memory }}"
               options: "{{ new_list_online }}"
-          - service: input_number.set_value
-            data:
-              entity_id: "{{ counter_off }}"
-              value: "{{ count }}"
           - sequence: !input online_actions
