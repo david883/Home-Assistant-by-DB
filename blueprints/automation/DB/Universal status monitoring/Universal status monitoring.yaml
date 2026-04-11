@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 11.04.2026-5 Autor: D.B.
+    #### Version 11.04.2026-6 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -15,8 +15,7 @@ blueprint:
 
     ---
 
-    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste als Gedächtnis und aktualisiert präzise einen Zahlen-Helfer.
-    Monitors entities for state changes. Uses a dropdown as memory and precisely updates a number helper.
+    Überwacht Entitäten auf Statusänderungen. Stellt Variablen wie {{ device }}, {{ threshold }}, {{ list }} und {{ count }} für Aktionen bereit.
 
   source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
   domain: automation
@@ -78,13 +77,11 @@ blueprint:
           unit_of_measurement: min
     memory_helper:
       name: "Gedächtnis Helfer / Memory Helper"
-      description: "Das Dropdown 'input_select.offline_gedachtnis_status_monitoring_script'."
       selector:
         entity:
           domain: input_select
     counter_helper:
       name: "Zähler Helfer / Counter Helper"
-      description: "Ein Nummern-Helfer (input_number) für die Anzahl der offline Geräte."
       selector:
         entity:
           domain: input_number
@@ -95,7 +92,7 @@ blueprint:
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: Das Gerät {{ device }} ist seit 5 Minuten nicht mehr erreichbar, folgende Geräte sind noch offline: {{ list }}"
+            value: "David: {{ device }} ist seit {{ threshold }} Min. offline. Andere: {{ list }}. (Gesamt: {{ count }})"
       selector:
         action: {}
     online_actions:
@@ -105,7 +102,7 @@ blueprint:
           target:
             entity_id: input_text.benachrichtigung_zum_verarbeiten
           data:
-            value: "David: Das Gerät {{ device }} ist wieder erreichbar, folgende Geräte sind noch offline: {{ list }}"
+            value: "David: {{ device }} ist wieder erreichbar. Andere offline: {{ list }}. (Gesamt: {{ count }})"
       selector:
         action: {}
 
@@ -132,6 +129,8 @@ action:
       counter: !input counter_helper
       monitored: !input monitored_entities
       off_states: !input offline_states
+      # Schwellenwert aus dem Input holen
+      threshold: !input offline_duration
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
       current_options: "{{ state_attr(memory, 'options') or [] }}"
@@ -144,10 +143,10 @@ action:
             {% set names.items = names.items + [state_attr(ent, 'friendly_name') or ent] %}
           {% endif %}
         {% endfor %}
-        {{ names.items | join(', ') if names.items | count > 0 else 'keine weiteren / none' }}
+        {{ names.items | join(', ') if names.items | count > 0 else 'keine' }}
 
   - choose:
-      # OFFLINE: ID hinzufügen
+      # OFFLINE
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -155,6 +154,8 @@ action:
         sequence:
           - variables:
               new_list_offline: "{{ (current_options + [trigger_ent, 'Platzhalter']) | unique | list }}"
+              # Count berechnen (ohne Platzhalter)
+              count: "{{ new_list_offline | reject('eq', 'Platzhalter') | list | count }}"
           - service: input_select.select_option
             data:
               entity_id: "{{ memory }}"
@@ -167,14 +168,13 @@ action:
             data:
               entity_id: "{{ memory }}"
               option: "{{ trigger_ent }}"
-          # Zähler sofort mit der berechneten Variablen setzen
           - service: input_number.set_value
             data:
               entity_id: "{{ counter }}"
-              value: "{{ new_list_offline | reject('eq', 'Platzhalter') | list | count }}"
+              value: "{{ count }}"
           - sequence: !input offline_actions
 
-      # ONLINE: ID entfernen
+      # ONLINE
       - conditions:
           - condition: trigger
             id: "trigger_online"
@@ -182,6 +182,8 @@ action:
         sequence:
           - variables:
               new_list_online: "{{ (current_options | reject('eq', trigger_ent) | list + ['Platzhalter']) | unique | list }}"
+              # Count berechnen (ohne Platzhalter)
+              count: "{{ new_list_online | reject('eq', 'Platzhalter') | list | count }}"
           - service: input_select.select_option
             data:
               entity_id: "{{ memory }}"
@@ -190,9 +192,8 @@ action:
             data:
               entity_id: "{{ memory }}"
               options: "{{ new_list_online }}"
-          # Zähler sofort mit der berechneten Variablen setzen
           - service: input_number.set_value
             data:
               entity_id: "{{ counter }}"
-              value: "{{ new_list_online | reject('eq', 'Platzhalter') | list | count }}"
+              value: "{{ count }}"
           - sequence: !input online_actions
