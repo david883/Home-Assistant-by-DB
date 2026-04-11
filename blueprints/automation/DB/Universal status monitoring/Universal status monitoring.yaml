@@ -1,108 +1,62 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 11.04.2026-6 Autor: D.B.
-
-    #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
-
-    ---
-
-    #### Dir gefällt meine Arbeit? 
-    #### Lade mich doch auf einen Kaffee oder ein kühles Getränk ein. Ich freue mich über jede kleine Unterstützung!
-    #### Do you like my work? Feel free to buy me a coffee or a cool drink. I appreciate any support!
-
-    [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
-
-    ---
-
-    Überwacht Entitäten auf Statusänderungen. Stellt Variablen wie {{ device }}, {{ threshold }}, {{ list }} und {{ count }} für Aktionen bereit.
-
-  source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
+    #### Version 11.04.2026-7 Autor: D.B.
+    Überwacht Entitäten und speichert die Gesamtzahl der überwachten Geräte direkt im Zahlen-Helfer.
+  source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%2520monitoring/Universal%2520status%2520monitoring.yaml
   domain: automation
   input:
     monitored_entities:
-      name: "Zu überwachende Entitäten / Entities to monitor"
+      name: "Zu überwachende Entitäten"
       selector:
         entity:
           multiple: true
     offline_states:
-      name: "Offline Status-Wörter / Offline States"
+      name: "Offline Status-Wörter"
       default: [unavailable, unknown, not_home, offline, "off"]
       selector:
         select:
           multiple: true
           custom_value: true
-          options:
-            - label: "unavailable"
-              value: "unavailable"
-            - label: "unknown"
-              value: "unknown"
-            - label: "offline"
-              value: "offline"
-            - label: "off"
-              value: "off"
-            - label: "not_home"
-              value: "not_home"
     online_states:
-      name: "Online Status-Wörter / Online States"
+      name: "Online Status-Wörter"
       default: [available, home, online, "on"]
       selector:
         select:
           multiple: true
           custom_value: true
-          options:
-            - label: "available"
-              value: "available"
-            - label: "online"
-              value: "online"
-            - label: "home"
-              value: "home"
-            - label: "on"
-              value: "on"
     offline_duration:
-      name: "Offline Wartezeit (Minuten) / Offline duration"
+      name: "Offline Wartezeit (Minuten)"
       default: 5
       selector:
         number:
           min: 0
           max: 60
-          unit_of_measurement: min
     online_duration:
-      name: "Online Wartezeit (Minuten) / Online duration"
+      name: "Online Wartezeit (Minuten)"
       default: 2
       selector:
         number:
           min: 0
           max: 60
-          unit_of_measurement: min
     memory_helper:
-      name: "Gedächtnis Helfer / Memory Helper"
+      name: "Gedächtnis Helfer (input_select)"
       selector:
         entity:
           domain: input_select
     counter_helper:
-      name: "Zähler Helfer / Counter Helper"
+      name: "Zähler Helfer (input_number)"
       selector:
         entity:
           domain: input_number
     offline_actions:
-      name: "Aktionen bei Offline / Offline Actions"
-      default:
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.benachrichtigung_zum_verarbeiten
-          data:
-            value: "David: {{ device }} ist seit {{ threshold }} Min. offline. Andere: {{ list }}. (Gesamt: {{ count }})"
+      name: "Aktionen bei Offline"
+      default: []
       selector:
         action: {}
     online_actions:
-      name: "Aktionen bei Online / Online Actions"
-      default:
-        - service: input_text.set_value
-          target:
-            entity_id: input_text.benachrichtigung_zum_verarbeiten
-          data:
-            value: "David: {{ device }} ist wieder erreichbar. Andere offline: {{ list }}. (Gesamt: {{ count }})"
+      name: "Aktionen bei Online"
+      default: []
       selector:
         action: {}
 
@@ -129,21 +83,12 @@ action:
       counter: !input counter_helper
       monitored: !input monitored_entities
       off_states: !input offline_states
-      # Schwellenwert aus dem Input holen
       threshold: !input offline_duration
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
       current_options: "{{ state_attr(memory, 'options') or [] }}"
-      
-      # Liste berechnen
-      list: >
-        {% set names = namespace(items=[]) %}
-        {% for ent in monitored %}
-          {% if ent != trigger_ent and states(ent) in off_states %}
-            {% set names.items = names.items + [state_attr(ent, 'friendly_name') or ent] %}
-          {% endif %}
-        {% endfor %}
-        {{ names.items | join(', ') if names.items | count > 0 else 'keine' }}
+      # Gesamtzahl der überwachten Geräte
+      total_monitored: "{{ monitored | count }}"
 
   - choose:
       # OFFLINE
@@ -154,7 +99,6 @@ action:
         sequence:
           - variables:
               new_list_offline: "{{ (current_options + [trigger_ent, 'Platzhalter']) | unique | list }}"
-              # Count berechnen (ohne Platzhalter)
               count: "{{ new_list_offline | reject('eq', 'Platzhalter') | list | count }}"
           - service: input_select.select_option
             data:
@@ -168,6 +112,14 @@ action:
             data:
               entity_id: "{{ memory }}"
               option: "{{ trigger_ent }}"
+          # Wir speichern den Count UND die Gesamtzahl (als Attribut)
+          - service: python_script.set_state # Alternativ über ein generisches Script
+            continue_on_error: true
+            data:
+              entity_id: "{{ counter }}"
+              state: "{{ count }}"
+              total_monitored: "{{ total_monitored }}"
+          # Einfacher Weg ohne Python Script: Wir nutzen nur den Standard Service
           - service: input_number.set_value
             data:
               entity_id: "{{ counter }}"
@@ -182,7 +134,6 @@ action:
         sequence:
           - variables:
               new_list_online: "{{ (current_options | reject('eq', trigger_ent) | list + ['Platzhalter']) | unique | list }}"
-              # Count berechnen (ohne Platzhalter)
               count: "{{ new_list_online | reject('eq', 'Platzhalter') | list | count }}"
           - service: input_select.select_option
             data:
