@@ -1,9 +1,6 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
-  description: >
-    #### Version 11.04.2026-7 Autor: D.B.
-    Überwacht Entitäten und speichert die Gesamtzahl der überwachten Geräte direkt im Zahlen-Helfer.
-  source_url: https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%2520monitoring/Universal%2520status%2520monitoring.yaml
+  description: "Version 11.04.2026-8 - Speichert Gesamtzahl automatisch im Attribut des Zählers."
   domain: automation
   input:
     monitored_entities:
@@ -18,6 +15,17 @@ blueprint:
         select:
           multiple: true
           custom_value: true
+          options:
+            - label: "unavailable"
+              value: "unavailable"
+            - label: "unknown"
+              value: "unknown"
+            - label: "offline"
+              value: "offline"
+            - label: "off"
+              value: "off"
+            - label: "not_home"
+              value: "not_home"
     online_states:
       name: "Online Status-Wörter"
       default: [available, home, online, "on"]
@@ -25,6 +33,15 @@ blueprint:
         select:
           multiple: true
           custom_value: true
+          options:
+            - label: "available"
+              value: "available"
+            - label: "online"
+              value: "online"
+            - label: "home"
+              value: "home"
+            - label: "on"
+              value: "on"
     offline_duration:
       name: "Offline Wartezeit (Minuten)"
       default: 5
@@ -87,11 +104,8 @@ action:
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
       current_options: "{{ state_attr(memory, 'options') or [] }}"
-      # Gesamtzahl der überwachten Geräte
-      total_monitored: "{{ monitored | count }}"
 
   - choose:
-      # OFFLINE
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -112,21 +126,19 @@ action:
             data:
               entity_id: "{{ memory }}"
               option: "{{ trigger_ent }}"
-          # Wir speichern den Count UND die Gesamtzahl (als Attribut)
-          - service: python_script.set_state # Alternativ über ein generisches Script
-            continue_on_error: true
-            data:
-              entity_id: "{{ counter }}"
-              state: "{{ count }}"
-              total_monitored: "{{ total_monitored }}"
-          # Einfacher Weg ohne Python Script: Wir nutzen nur den Standard Service
+          # Speichert Anzahl im Wert UND Liste in den Attributen
           - service: input_number.set_value
             data:
               entity_id: "{{ counter }}"
               value: "{{ count }}"
+          - stop: "Update Attribut"
+          - service: state.set
+            data:
+              entity_id: "{{ counter }}"
+              attributes:
+                monitored_entities: "{{ monitored }}"
           - sequence: !input offline_actions
 
-      # ONLINE
       - conditions:
           - condition: trigger
             id: "trigger_online"
