@@ -10,12 +10,12 @@ blueprint:
     
     ---
     
-    ### Version 13.04.2026-2
+    ### Version 13.04.2026-3
     **Autor: D.B.**
 
-    DE: Präzise Sensor-Automatik mit Counter-Logik, Nachtsperre und individuellen Aktions-Listen.
+    DE: Counter-Logik optimiert: Impulse werden nur gezählt, wenn der Status aktuell 'Abwesend' ist.
     
-    EN: Precise sensor automation with counter logic, night lock, and individual action lists.
+    EN: Counter logic optimized: Triggers are only counted if the current status is 'Absent'.
   domain: automation
   input:
     activity_sensors:
@@ -161,7 +161,7 @@ variables:
   var_master_presence: !input master_presence_enabled
   var_master_absence: !input master_absence_enabled
   var_reset_min: !input counter_reset_timeout
-  presence_boolean: !input presence_boolean
+  var_presence_boolean: !input presence_boolean
 
 trigger:
   - platform: state
@@ -224,16 +224,21 @@ action:
                 target:
                   entity_id: !input presence_counter
             else:
+              # COUNTER NUR HOCHZÄHLEN WENN STATUS AKTUELL 'OFF' IST
               - if:
                   - condition: template
-                    value_template: "{{ trigger.entity_id in var_sensors and states(trigger.entity_id) in var_states_active }}"
+                    value_template: >
+                      {{ trigger.entity_id in var_sensors and states(trigger.entity_id) in var_states_active 
+                         and states(var_presence_boolean) == 'off' }}
                 then:
                   - action: counter.increment
                     target:
                       entity_id: !input presence_counter
+              
+              # SCHWELLENWERT CHECK
               - if:
                   - condition: template
-                    value_template: "{{ states(var_counter) | int >= (var_threshold | int) and states(presence_boolean) == 'off' }}"
+                    value_template: "{{ states(var_counter) | int >= (var_threshold | int) and states(var_presence_boolean) == 'off' }}"
                 then:
                   - action: input_boolean.turn_on
                     target:
