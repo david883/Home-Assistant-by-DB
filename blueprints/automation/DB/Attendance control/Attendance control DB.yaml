@@ -10,13 +10,14 @@ blueprint:
     
     ---
     
-    ### Version 13.04.2026-3
+    ### Version 13.04.2026-4
     **Autor: D.B.**
 
-    DE: Counter-Logik optimiert: Impulse werden nur gezählt, wenn der Status aktuell 'Abwesend' ist.
+    DE: Präzise Sensor-Automatik mit Counter-Logik (nur bei Abwesenheit), Nachtsperre und Source-URL für Updates.
     
-    EN: Counter logic optimized: Triggers are only counted if the current status is 'Absent'.
+    EN: Precise sensor automation with counter logic (only when absent), night lock, and source URL for updates.
   domain: automation
+  source_url: https://github.com/david883/Home-Assistant-by-DB/blob/beta/blueprints%2Fautomation%2FDB%2FAttendance%20control%2FAttendance%20control%20DB.yaml
   input:
     activity_sensors:
       name: "Sensoren - Sensors"
