@@ -10,23 +10,29 @@ blueprint:
     
     ---
     
-    ### Version 13.04.2026-1
+    ### Version 13.04.2026-2
     **Autor: D.B.**
 
-    DE: Sensor-Automatik und Counter-Logik zur präzisen Anwesenheitssteuerung.
+    DE: Präzise Sensor-Automatik mit Counter-Logik, Nachtsperre und individuellen Aktions-Listen.
     
-    EN: Sensor automation and counter logic for precise presence control.
+    EN: Precise sensor automation with counter logic, night lock, and individual action lists.
   domain: automation
   input:
     activity_sensors:
       name: "Sensoren - Sensors"
-      description: "DE: Sensoren für Anwesenheit.\n\nEN: Presence sensors."
+      description: >-
+        DE: Sensoren, die Anwesenheit anzeigen (z.B. Bewegungsmelder, Türkontakte).
+        
+        EN: Sensors indicating presence (e.g., motion detectors, door contacts).
       selector:
         entity:
           multiple: true
     activity_states:
       name: "Zustände Aktiv - Active States"
-      description: "DE: Zustände für ANWESEND.\n\nEN: Active states."
+      description: >-
+        DE: Zustände, die als AKTIV gelten (z.B. on, motion, home).
+        
+        EN: States considered ACTIVE (e.g., on, motion, home).
       default: ["on", "motion", "occupied"]
       selector:
         select:
@@ -35,48 +41,76 @@ blueprint:
           options: ["on", "motion", "occupied", "home"]
     presence_boolean:
       name: "Anwesenheits Status - Presence Status"
-      description: "DE: Der zentrale Status-Schalter.\n\nEN: Central status switch."
+      description: >-
+        DE: Der zentrale Helfer-Schalter (Input Boolean) für den aktuellen Status.
+        
+        EN: The central helper switch (input boolean) for the current status.
       selector:
         entity:
           filter:
             domain: input_boolean
     master_presence_enabled:
       name: "Master: Anwesenheit aktivieren - Master: Presence enabled"
-      description: "DE: Automatik für Kommen erlauben.\n\nEN: Allow auto-arriving."
+      description: >-
+        DE: Erlaubt das automatische Setzen auf 'Anwesend' bei Sensor-Aktivität.
+        
+        EN: Allows automatic setting to 'Present' upon sensor activity.
       default: true
       selector:
         boolean: {}
     master_absence_enabled:
       name: "Master: Abwesenheit aktivieren - Master: Absence enabled"
-      description: "DE: Automatik für Verlassen erlauben.\n\nEN: Allow auto-leaving."
+      description: >-
+        DE: Erlaubt das automatische Setzen auf 'Abwesend' nach Ablauf der Wartezeit.
+        
+        EN: Allows automatic setting to 'Absent' after the delay expires.
       default: true
       selector:
         boolean: {}
     absence_delay:
       name: "Wartezeit Abwesenheit - Absence Delay"
-      description: "DE: Verzögerung für die Automatik.\n\nEN: Delay for automation."
+      description: >-
+        DE: Zeit ohne Sensor-Aktivität, bis die Automatik auf ABWESEND schaltet.
+        
+        EN: Time without sensor activity until the automation switches to ABSENT.
       default:
         minutes: 1
       selector:
         duration: {}
     night_lock_start:
       name: "Nachtsperre beginnt um - Night lock starts at"
+      description: >-
+        DE: Uhrzeit, ab der kein automatisches Abwesend-Schalten erfolgt (z.B. Schlafenszeit).
+        
+        EN: Time from which no automatic absence switching occurs (e.g., bedtime).
       default: "22:00:00"
       selector:
         time: {}
     night_lock_end:
       name: "Nachtsperre endet um - Night lock ends at"
+      description: >-
+        DE: Uhrzeit, ab der die Nachtsperre wieder aufgehoben ist.
+        
+        EN: Time when the night lock is lifted again.
       default: "08:00:00"
       selector:
         time: {}
     presence_counter:
       name: "Aktivitäts Counter - Activity Counter"
+      description: >-
+        DE: Counter-Helfer, der die Sensor-Impulse zählt, bevor auf ANWESEND geschaltet wird.
+        
+        EN: Counter helper that counts sensor triggers before switching to PRESENT.
       selector:
         entity:
           filter:
             domain: counter
     counter_threshold:
       name: "Schwellenwert - Threshold"
+      description: >-
+        DE: Anzahl der nötigen Sensor-Impulse innerhalb des Zeitfensters für den Status 'Anwesend'.
+        
+        EN: Number of required sensor triggers within the time window for the 'Present' status.
       default: 2
       selector:
         number:
@@ -84,6 +118,10 @@ blueprint:
           max: 10
     counter_reset_timeout:
       name: "Zeitfenster für Impulse - Counter Reset Timeout"
+      description: >-
+        DE: Zeitraum in Minuten, in dem die Impulse für den Schwellenwert erfolgen müssen.
+        
+        EN: Period in minutes within which the triggers for the threshold must occur.
       default: 5
       selector:
         number:
@@ -92,11 +130,19 @@ blueprint:
           unit_of_measurement: "min"
     absence_actions:
       name: "Aktionen Abwesenheit - Absence Actions"
+      description: >-
+        DE: Aktionen, die beim Wechsel in den Status ABWESEND ausgeführt werden (z.B. Licht aus).
+        
+        EN: Actions executed when switching to ABSENT status (e.g., lights off).
       default: []
       selector:
         action: {}
     presence_actions:
       name: "Aktionen Anwesenheit - Presence Actions"
+      description: >-
+        DE: Aktionen, die beim Wechsel in den Status ANWESEND ausgeführt werden (z.B. Licht an).
+        
+        EN: Actions executed when switching to PRESENT status (e.g., lights on).
       default: []
       selector:
         action: {}
@@ -115,6 +161,7 @@ variables:
   var_master_presence: !input master_presence_enabled
   var_master_absence: !input master_absence_enabled
   var_reset_min: !input counter_reset_timeout
+  presence_boolean: !input presence_boolean
 
 trigger:
   - platform: state
