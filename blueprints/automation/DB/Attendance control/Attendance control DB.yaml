@@ -10,30 +10,23 @@ blueprint:
     
     ---
     
-    ### Version 13.04.2026-4
+    ### Version 14.04.2026-1
     **Autor: D.B.**
 
-    DE: Präzise Sensor-Automatik mit Counter-Logik (nur bei Abwesenheit), Nachtsperre und Source-URL für Updates.
+    DE: Optimierte Nachtsperre durch Minuten-Vergleich (robuster gegen Formatfehler) und Source-URL.
     
-    EN: Precise sensor automation with counter logic (only when absent), night lock, and source URL for updates.
+    EN: Optimized night lock using minute comparison (robust against format errors) and source URL.
   domain: automation
   source_url: https://github.com/david883/Home-Assistant-by-DB/blob/beta/blueprints%2Fautomation%2FDB%2FAttendance%20control%2FAttendance%20control%20DB.yaml
   input:
     activity_sensors:
       name: "Sensoren - Sensors"
-      description: >-
-        DE: Sensoren, die Anwesenheit anzeigen (z.B. Bewegungsmelder, Türkontakte).
-        
-        EN: Sensors indicating presence (e.g., motion detectors, door contacts).
+      description: "DE: Sensoren für Anwesenheit.\n\nEN: Presence sensors."
       selector:
         entity:
           multiple: true
     activity_states:
       name: "Zustände Aktiv - Active States"
-      description: >-
-        DE: Zustände, die als AKTIV gelten (z.B. on, motion, home).
-        
-        EN: States considered ACTIVE (e.g., on, motion, home).
       default: ["on", "motion", "occupied"]
       selector:
         select:
@@ -42,76 +35,44 @@ blueprint:
           options: ["on", "motion", "occupied", "home"]
     presence_boolean:
       name: "Anwesenheits Status - Presence Status"
-      description: >-
-        DE: Der zentrale Helfer-Schalter (Input Boolean) für den aktuellen Status.
-        
-        EN: The central helper switch (input boolean) for the current status.
       selector:
         entity:
           filter:
             domain: input_boolean
     master_presence_enabled:
       name: "Master: Anwesenheit aktivieren - Master: Presence enabled"
-      description: >-
-        DE: Erlaubt das automatische Setzen auf 'Anwesend' bei Sensor-Aktivität.
-        
-        EN: Allows automatic setting to 'Present' upon sensor activity.
       default: true
       selector:
         boolean: {}
     master_absence_enabled:
       name: "Master: Abwesenheit aktivieren - Master: Absence enabled"
-      description: >-
-        DE: Erlaubt das automatische Setzen auf 'Abwesend' nach Ablauf der Wartezeit.
-        
-        EN: Allows automatic setting to 'Absent' after the delay expires.
       default: true
       selector:
         boolean: {}
     absence_delay:
       name: "Wartezeit Abwesenheit - Absence Delay"
-      description: >-
-        DE: Zeit ohne Sensor-Aktivität, bis die Automatik auf ABWESEND schaltet.
-        
-        EN: Time without sensor activity until the automation switches to ABSENT.
       default:
         minutes: 1
       selector:
         duration: {}
     night_lock_start:
       name: "Nachtsperre beginnt um - Night lock starts at"
-      description: >-
-        DE: Uhrzeit, ab der kein automatisches Abwesend-Schalten erfolgt (z.B. Schlafenszeit).
-        
-        EN: Time from which no automatic absence switching occurs (e.g., bedtime).
       default: "22:00:00"
       selector:
         time: {}
     night_lock_end:
       name: "Nachtsperre endet um - Night lock ends at"
-      description: >-
-        DE: Uhrzeit, ab der die Nachtsperre wieder aufgehoben ist.
-        
-        EN: Time when the night lock is lifted again.
       default: "08:00:00"
       selector:
         time: {}
     presence_counter:
       name: "Aktivitäts Counter - Activity Counter"
-      description: >-
-        DE: Counter-Helfer, der die Sensor-Impulse zählt, bevor auf ANWESEND geschaltet wird.
-        
-        EN: Counter helper that counts sensor triggers before switching to PRESENT.
       selector:
         entity:
           filter:
             domain: counter
     counter_threshold:
       name: "Schwellenwert - Threshold"
-      description: >-
-        DE: Anzahl der nötigen Sensor-Impulse innerhalb des Zeitfensters für den Status 'Anwesend'.
-        
-        EN: Number of required sensor triggers within the time window for the 'Present' status.
       default: 2
       selector:
         number:
@@ -119,10 +80,6 @@ blueprint:
           max: 10
     counter_reset_timeout:
       name: "Zeitfenster für Impulse - Counter Reset Timeout"
-      description: >-
-        DE: Zeitraum in Minuten, in dem die Impulse für den Schwellenwert erfolgen müssen.
-        
-        EN: Period in minutes within which the triggers for the threshold must occur.
       default: 5
       selector:
         number:
@@ -131,19 +88,11 @@ blueprint:
           unit_of_measurement: "min"
     absence_actions:
       name: "Aktionen Abwesenheit - Absence Actions"
-      description: >-
-        DE: Aktionen, die beim Wechsel in den Status ABWESEND ausgeführt werden (z.B. Licht aus).
-        
-        EN: Actions executed when switching to ABSENT status (e.g., lights off).
       default: []
       selector:
         action: {}
     presence_actions:
       name: "Aktionen Anwesenheit - Presence Actions"
-      description: >-
-        DE: Aktionen, die beim Wechsel in den Status ANWESEND ausgeführt werden (z.B. Licht an).
-        
-        EN: Actions executed when switching to PRESENT status (e.g., lights on).
       default: []
       selector:
         action: {}
@@ -181,19 +130,30 @@ action:
             value_template: "{{ var_master_absence }}"
           - condition: template
             value_template: >
+              {# Sensoren inaktiv? #}
               {% set active = expand(var_sensors) | selectattr('state', 'in', var_states_active) | list | count == 0 %}
+              
+              {# Zeit seit letzter Änderung berechnen #}
               {% set last_ch = expand(var_sensors) | map(attribute='last_changed') | max %}
               {% set h = var_delay.hours | default(0) | int %}
               {% set m = var_delay.minutes | default(0) | int %}
               {% set s = var_delay.seconds | default(0) | int %}
               {% set wait = (h * 3600) + (m * 60) + s %}
               {% set time_ok = (as_timestamp(now()) - as_timestamp(last_ch)) >= (wait - 1) %}
-              {% set cur = now().strftime('%H:%M:%S') %}
-              {% if var_lock_start < var_lock_end %}
-                {% set locked = var_lock_start <= cur <= var_lock_end %}
+              
+              {# Nachtsperre Logik (Minuten seit Mitternacht) #}
+              {% set now_min = now().hour * 60 + now().minute %}
+              {% set start_parts = var_lock_start.split(':') %}
+              {% set start_min = start_parts[0]|int * 60 + start_parts[1]|int %}
+              {% set end_parts = var_lock_end.split(':') %}
+              {% set end_min = end_parts[0]|int * 60 + end_parts[1]|int %}
+              
+              {% if start_min < end_min %}
+                {% set locked = start_min <= now_min < end_min %}
               {% else %}
-                {% set locked = cur >= var_lock_start or cur <= var_lock_end %}
+                {% set locked = now_min >= start_min or now_min < end_min %}
               {% endif %}
+              
               {{ active and time_ok and not locked }}
         sequence:
           - action: input_boolean.turn_off
@@ -225,7 +185,6 @@ action:
                 target:
                   entity_id: !input presence_counter
             else:
-              # COUNTER NUR HOCHZÄHLEN WENN STATUS AKTUELL 'OFF' IST
               - if:
                   - condition: template
                     value_template: >
@@ -236,7 +195,6 @@ action:
                     target:
                       entity_id: !input presence_counter
               
-              # SCHWELLENWERT CHECK
               - if:
                   - condition: template
                     value_template: "{{ states(var_counter) | int >= (var_threshold | int) and states(var_presence_boolean) == 'off' }}"
