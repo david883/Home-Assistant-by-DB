@@ -1,7 +1,6 @@
 # Anwesenheits-Steuerung DB (Presence Control DB)
 
 ![Home Assistant Badge](https://img.shields.io/badge/Home%20Assistant-Blueprint-blue.svg)
-![Version](https://img.shields.io/badge/Version-1.4.7-green.svg)
 ![License](https://img.shields.io/badge/License-GPL%203.0-red.svg)
 
 ---
