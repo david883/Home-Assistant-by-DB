@@ -10,12 +10,12 @@ blueprint:
     
     ---
     
-    ### Version 13.04.2026-4
+    ### Version 14.04.2026-2
     **Autor: D.B.**
 
-    DE: Präzise Sensor-Automatik mit Counter-Logik (nur bei Abwesenheit), Nachtsperre und Source-URL für Updates.
+    DE: Präzise Sensor-Automatik mit robuster Nachtsperre (Minuten-Vergleich) und vollständigen Beschreibungen.
     
-    EN: Precise sensor automation with counter logic (only when absent), night lock, and source URL for updates.
+    EN: Precise sensor automation with robust night lock (minute comparison) and full descriptions.
   domain: automation
   source_url: https://github.com/david883/Home-Assistant-by-DB/blob/main/blueprints%2Fautomation%2FDB%2FAttendance%20control%2FAttendance%20control%20DB.yaml
   input:
@@ -188,12 +188,19 @@ action:
               {% set s = var_delay.seconds | default(0) | int %}
               {% set wait = (h * 3600) + (m * 60) + s %}
               {% set time_ok = (as_timestamp(now()) - as_timestamp(last_ch)) >= (wait - 1) %}
-              {% set cur = now().strftime('%H:%M:%S') %}
-              {% if var_lock_start < var_lock_end %}
-                {% set locked = var_lock_start <= cur <= var_lock_end %}
+              
+              {% set now_min = now().hour * 60 + now().minute %}
+              {% set start_parts = var_lock_start.split(':') %}
+              {% set start_min = start_parts[0]|int * 60 + start_parts[1]|int %}
+              {% set end_parts = var_lock_end.split(':') %}
+              {% set end_min = end_parts[0]|int * 60 + end_parts[1]|int %}
+              
+              {% if start_min < end_min %}
+                {% set locked = start_min <= now_min < end_min %}
               {% else %}
-                {% set locked = cur >= var_lock_start or cur <= var_lock_end %}
+                {% set locked = now_min >= start_min or now_min < end_min %}
               {% endif %}
+              
               {{ active and time_ok and not locked }}
         sequence:
           - action: input_boolean.turn_off
@@ -225,7 +232,6 @@ action:
                 target:
                   entity_id: !input presence_counter
             else:
-              # COUNTER NUR HOCHZÄHLEN WENN STATUS AKTUELL 'OFF' IST
               - if:
                   - condition: template
                     value_template: >
@@ -235,8 +241,6 @@ action:
                   - action: counter.increment
                     target:
                       entity_id: !input presence_counter
-              
-              # SCHWELLENWERT CHECK
               - if:
                   - condition: template
                     value_template: "{{ states(var_counter) | int >= (var_threshold | int) and states(var_presence_boolean) == 'off' }}"
