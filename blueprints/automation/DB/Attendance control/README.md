@@ -1,7 +1,6 @@
 # Anwesenheits-Steuerung DB (Presence Control DB)
 
 ![Home Assistant Badge](https://img.shields.io/badge/Home%20Assistant-Blueprint-blue.svg)
-![Version](https://img.shields.io/badge/Version-1.4.7-green.svg)
 ![License](https://img.shields.io/badge/License-GPL%203.0-red.svg)
 
 ---
@@ -14,7 +13,7 @@ Diese umfangreiche Automatisierung steuert den Anwesenheitsstatus (Präsenz) bas
 * **Aktivitäts-Prüfung:** Nutzt mehrere Sensoren (Bewegung, Kontakte) zur Erkennung von Anwesenheit.
 * **Schwellenwert-Logik:** Verhindert "Geister-Anwesenheit" durch einen einstellbaren Counter (z.B. erst nach 2 Impulsen innerhalb von 5 Minuten auf 'Anwesend' schalten).
 * **Intelligente Abwesenheit:** Schaltet nach einer definierbaren Wartezeit auf 'Abwesend', sofern keine Aktivität mehr erkannt wird.
-* **Nachtsperre:** Sperrzeit definieren, in der die Automatik nicht auf 'Abwesend' schaltet (ideal für die Schlafenszeit).
+* **Nachtsperre:** Eine Sperrzeit definieren, in der die Automatik nicht auf 'Abwesend' schaltet (ideal für die Schlafenszeit).
 * **Master-Schalter:** Separate Aktivierung/Deaktivierung der Automatik für Kommen und Gehen.
 
 ---
@@ -49,8 +48,6 @@ Klicke auf den Button, um den Blueprint direkt in deine Home Assistant Instanz z
 ### 📋 Voraussetzungen - Requirements
 * Ein `input_boolean` für den Anwesenheitsstatus.
 * Ein `counter` Helfer für die Impuls-Logik.
-* Zwei `input_datetime` Helfer (nur Uhrzeit) für die Nachtsperre.
-* Zwei `input_boolean` Helfer als Master-Schalter.
 
 ---
 **Autor:** D.B.  
