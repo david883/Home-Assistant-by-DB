@@ -14,7 +14,7 @@ Diese umfangreiche Automatisierung steuert den Anwesenheitsstatus (Präsenz) bas
 * **Aktivitäts-Prüfung:** Nutzt mehrere Sensoren (Bewegung, Kontakte) zur Erkennung von Anwesenheit.
 * **Schwellenwert-Logik:** Verhindert "Geister-Anwesenheit" durch einen einstellbaren Counter (z.B. erst nach 2 Impulsen innerhalb von 5 Minuten auf 'Anwesend' schalten).
 * **Intelligente Abwesenheit:** Schaltet nach einer definierbaren Wartezeit auf 'Abwesend', sofern keine Aktivität mehr erkannt wird.
-* **Nachtsperre einstellbar:** Sperrzeit definieren, in der die Automatik nicht auf 'Abwesend' schaltet (ideal für die Schlafenszeit).
+* **Nachtsperre:** Sperrzeit definieren, in der die Automatik nicht auf 'Abwesend' schaltet (ideal für die Schlafenszeit).
 * **Master-Schalter:** Separate Aktivierung/Deaktivierung der Automatik für Kommen und Gehen.
 
 ---
