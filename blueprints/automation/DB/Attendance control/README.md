@@ -48,8 +48,6 @@ Klicke auf den Button, um den Blueprint direkt in deine Home Assistant Instanz z
 ### 📋 Voraussetzungen - Requirements
 * Ein `input_boolean` für den Anwesenheitsstatus.
 * Ein `counter` Helfer für die Impuls-Logik.
-* Zwei `input_datetime` Helfer (nur Uhrzeit) für die Nachtsperre.
-* Zwei `input_boolean` Helfer als Master-Schalter.
 
 ---
 **Autor:** D.B.  
