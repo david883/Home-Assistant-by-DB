@@ -1,19 +1,30 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 19.04.2026-2 Autor: D.B.
+    #### Version 19.04.2026-1c Autor: D.B.
 
-    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste als Gedächtnis, reinigt sich bei Geräte-Entfernung selbst und zählt überwachte Geräte.
+    #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
+
+    ---
+
+    #### Dir gefällt meine Arbeit? Lade mich doch auf einen Kaffee ein!
+    [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
+
+    ---
+
+    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als Gedächtnis, reinigt sich bei Geräte-Entfernung selbst und zählt die überwachten Geräte automatisch.
 
   domain: automation
   input:
     monitored_entities:
       name: "Zu überwachende Entitäten"
+      description: "Wähle alle Geräte aus, die überwacht werden sollen."
       selector:
         entity:
           multiple: true
     offline_states:
       name: "Offline Status-Wörter"
+      description: "Zustände, die als 'Offline' gelten."
       default: ["unavailable", "unknown", "not_home", "offline", "off"]
       selector:
         select:
@@ -32,6 +43,7 @@ blueprint:
               value: "not_home"
     online_states:
       name: "Online Status-Wörter"
+      description: "Zustände, die als 'Online' gelten."
       default: ["available", "home", "online", "on"]
       selector:
         select:
@@ -48,6 +60,7 @@ blueprint:
               value: "on"
     offline_duration:
       name: "Offline Wartezeit (Minuten)"
+      description: "Zeit, bis die Offline-Meldung erfolgt."
       default: 5
       selector:
         number:
@@ -55,6 +68,7 @@ blueprint:
           max: 60
     online_duration:
       name: "Online Wartezeit (Minuten)"
+      description: "Zeit, bis die Online-Meldung erfolgt."
       default: 2
       selector:
         number:
@@ -62,21 +76,25 @@ blueprint:
           max: 60
     memory_helper:
       name: "Gedächtnis Helfer (input_select)"
+      description: "Wähle dein Dropdown für das Gedächtnis."
       selector:
         entity:
           domain: input_select
     counter_helper_total:
       name: "Zähler: Überwacht Gesamt (input_number)"
+      description: "Wähle den Nummern-Helfer, der die Gesamtzahl speichern soll."
       selector:
         entity:
           domain: input_number
     offline_actions:
       name: "Aktionen bei Offline"
+      description: "Was soll passieren, wenn ein Gerät offline geht?"
       default: []
       selector:
         action: {}
     online_actions:
       name: "Aktionen bei Online"
+      description: "Was soll passieren, wenn ein Gerät wieder online geht?"
       default: []
       selector:
         action: {}
@@ -85,7 +103,7 @@ mode: parallel
 max: 50
 
 action:
-  # 1. BEREINIGUNG
+  # 1. BEREINIGUNG: Zombie-Geräte entfernen
   - variables:
       memory: !input memory_helper
       monitored: !input monitored_entities
@@ -126,6 +144,7 @@ action:
       value: "{{ total_count }}"
 
   - choose:
+      # OFFLINE
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -147,6 +166,7 @@ action:
               option: "{{ trigger_ent }}"
           - sequence: !input offline_actions
 
+      # ONLINE
       - conditions:
           - condition: trigger
             id: "trigger_online"
