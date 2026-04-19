@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 19.04.2026-1c Autor: D.B.
+    #### Version 19.04.2026-2 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -12,13 +12,13 @@ blueprint:
 
     ---
 
-    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als Gedächtnis, reinigt sich bei Geräte-Entfernung selbst und zählt die überwachten Geräte automatisch.
+    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als Gedächtnis, reinigt sich selbst und zählt überwachte Geräte.
 
   domain: automation
   input:
     monitored_entities:
       name: "Zu überwachende Entitäten"
-      description: "Wähle alle Geräte aus, die überwacht werden sollen."
+      description: "Wähle die Geräte aus, die überwacht werden sollen."
       selector:
         entity:
           multiple: true
@@ -60,7 +60,6 @@ blueprint:
               value: "on"
     offline_duration:
       name: "Offline Wartezeit (Minuten)"
-      description: "Zeit, bis die Offline-Meldung erfolgt."
       default: 5
       selector:
         number:
@@ -68,7 +67,6 @@ blueprint:
           max: 60
     online_duration:
       name: "Online Wartezeit (Minuten)"
-      description: "Zeit, bis die Online-Meldung erfolgt."
       default: 2
       selector:
         number:
@@ -102,8 +100,23 @@ blueprint:
 mode: parallel
 max: 50
 
+# WICHTIG: Der Trigger-Block muss hier stehen, damit Home Assistant ihn findet!
+trigger:
+  - trigger: state
+    entity_id: !input monitored_entities
+    for:
+      minutes: !input offline_duration
+    id: "trigger_offline"
+    to: !input offline_states
+  - trigger: state
+    entity_id: !input monitored_entities
+    for:
+      minutes: !input online_duration
+    id: "trigger_online"
+    to: !input online_states
+
 action:
-  # 1. BEREINIGUNG: Zombie-Geräte entfernen
+  # 1. BEREINIGUNG
   - variables:
       memory: !input memory_helper
       monitored: !input monitored_entities
@@ -123,7 +136,6 @@ action:
   - variables:
       counter_total: !input counter_helper_total
       off_states: !input offline_states
-      threshold: !input offline_duration
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
       current_options: "{{ state_attr(memory, 'options') or [] }}"
@@ -144,7 +156,6 @@ action:
       value: "{{ total_count }}"
 
   - choose:
-      # OFFLINE
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -166,7 +177,6 @@ action:
               option: "{{ trigger_ent }}"
           - sequence: !input offline_actions
 
-      # ONLINE
       - conditions:
           - condition: trigger
             id: "trigger_online"
