@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB (V2 - Auto Cleanup)"
   description: >
-    #### Version 19.04.2026-2c Autor: D.B.
+    #### Version 19.04.2026-3 Autor: D.B.
 
     ### 🆕 Änderungen V2:
     - Automatische Bereinigung des Offline-Gedächtnisses
@@ -25,6 +25,17 @@ blueprint:
         select:
           multiple: true
           custom_value: true
+          options:
+            - label: "unavailable"
+              value: "unavailable"
+            - label: "unknown"
+              value: "unknown"
+            - label: "offline"
+              value: "offline"
+            - label: "off"
+              value: "off"
+            - label: "not_home"
+              value: "not_home"
 
     online_states:
       name: "Online Status"
@@ -33,6 +44,15 @@ blueprint:
         select:
           multiple: true
           custom_value: true
+          options:
+            - label: "available"
+              value: "available"
+            - label: "online"
+              value: "online"
+            - label: "home"
+              value: "home"
+            - label: "on"
+              value: "on"
 
     offline_duration:
       name: "Offline Wartezeit (Minuten)"
@@ -102,7 +122,7 @@ action:
 
       current_options: "{{ state_attr(memory, 'options') or [] }}"
 
-      # 🧹 CLEANUP: entferne ungültige Einträge
+      # 🧹 CLEANUP
       cleaned_options: >
         {% set valid = [] %}
         {% for opt in current_options %}
@@ -123,7 +143,7 @@ action:
         {% endfor %}
         {{ names.items | join(', ') if names.items | count > 0 else 'keine' }}
 
-  # 🧹 IMMER zuerst bereinigen
+  # 🧹 Cleanup immer zuerst
   - service: input_select.set_options
     data:
       entity_id: "{{ memory }}"
