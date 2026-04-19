@@ -1,69 +1,33 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 19.04.2026-2z Autor: D.B.
+    #### Version 19.04.2026-3 Autor: D.B.
 
-    #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
-
-    ---
-
-    #### Dir gefällt meine Arbeit? Lade mich doch auf einen Kaffee ein!
-    [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
-
-    ---
-
-    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als Gedächtnis, reinigt sich bei Geräte-Entfernung selbst und zählt die überwachten Geräte automatisch.
-
-    In den Actions Blöcken können Platzhalter für Nachrichten genutzt werden. 
-    Beispiel: Das Gerät {{ device }} ist seit 5 Minuten nicht mehr erreichbar, folgende Geräte sind noch offline: {{ list }}
+    Überwacht Entitäten auf Statusänderungen. Trigger-Logik optimiert für mehrere Zustände.
 
   domain: automation
   input:
     monitored_entities:
       name: "Zu überwachende Entitäten"
-      description: "Wähle hier alle Geräte aus, die du überwachen möchtest."
       selector:
         entity:
           multiple: true
     offline_states:
       name: "Offline Status-Wörter"
-      description: "Welche Zustände sollen als 'Offline' gewertet werden?"
       default: ["unavailable", "unknown", "not_home", "offline", "off"]
       selector:
         select:
           multiple: true
           custom_value: true
-          options:
-            - label: "unavailable"
-              value: "unavailable"
-            - label: "unknown"
-              value: "unknown"
-            - label: "offline"
-              value: "offline"
-            - label: "off"
-              value: "off"
-            - label: "not_home"
-              value: "not_home"
     online_states:
       name: "Online Status-Wörter"
-      description: "Welche Zustände sollen als 'Online' gewertet werden?"
       default: ["available", "home", "online", "on"]
       selector:
         select:
           multiple: true
           custom_value: true
-          options:
-            - label: "available"
-              value: "available"
-            - label: "online"
-              value: "online"
-            - label: "home"
-              value: "home"
-            - label: "on"
-              value: "on"
     offline_duration:
       name: "Offline Wartezeit (Minuten)"
-      description: "Zeit, bis die Offline-Meldung erfolgt."
       default: 5
       selector:
         number:
@@ -71,7 +35,6 @@ blueprint:
           max: 60
     online_duration:
       name: "Online Wartezeit (Minuten)"
-      description: "Zeit, bis die Online-Meldung erfolgt."
       default: 2
       selector:
         number:
@@ -79,48 +42,43 @@ blueprint:
           max: 60
     memory_helper:
       name: "Gedächtnis Helfer (input_select)"
-      description: "Wähle dein Dropdown für das Gedächtnis."
       selector:
         entity:
           domain: input_select
     counter_helper_total:
       name: "Zähler: Überwacht Gesamt (input_number)"
-      description: "Wähle den Nummern-Helfer, der die Gesamtzahl speichern soll."
       selector:
         entity:
           domain: input_number
     offline_actions:
       name: "Aktionen bei Offline"
-      description: "Was soll passieren, wenn ein Gerät offline geht?"
       default: []
       selector:
         action: {}
     online_actions:
       name: "Aktionen bei Online"
-      description: "Was soll passieren, wenn ein Gerät wieder online geht?"
       default: []
       selector:
         action: {}
 
+# TRIGGER: Trigger auf jede Statusänderung (ohne Einschränkung durch 'to')
 trigger:
   - platform: state
     entity_id: !input monitored_entities
     for:
       minutes: !input offline_duration
     id: "trigger_offline"
-    to: !input offline_states
   - platform: state
     entity_id: !input monitored_entities
     for:
       minutes: !input online_duration
     id: "trigger_online"
-    to: !input online_states
 
 mode: parallel
 max: 50
 
 action:
-  # 1. BEREINIGUNG: Entfernt "Zombie"-Geräte aus dem Gedächtnis
+  # 1. BEREINIGUNG
   - variables:
       memory: !input memory_helper
       monitored: !input monitored_entities
@@ -136,14 +94,16 @@ action:
     data:
       options: "{{ clean_list }}"
 
-  # 2. HAUPTLOGIK
+  # 2. HAUPTLOGIK & FILTER
   - variables:
       counter_total: !input counter_helper_total
       off_states: !input offline_states
+      on_states: !input online_states
       trigger_ent: "{{ trigger.entity_id }}"
       device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
       current_options: "{{ state_attr(memory, 'options') or [] }}"
       total_count: "{{ monitored | count }}"
+      new_state: "{{ trigger.to_state.state }}"
       
       list: >
         {% set names = namespace(items=[]) %}
@@ -160,10 +120,11 @@ action:
       value: "{{ total_count }}"
 
   - choose:
-      # OFFLINE
+      # OFFLINE FILTER
       - conditions:
           - condition: trigger
             id: "trigger_offline"
+          - "{{ new_state in off_states }}"
           - "{{ trigger_ent not in current_options }}"
         sequence:
           - variables:
@@ -176,20 +137,17 @@ action:
             data:
               entity_id: "{{ memory }}"
               options: "{{ new_list_offline }}"
-          - service: input_select.set_options
-            data:
-              entity_id: "{{ memory }}"
-              options: "{{ new_list_offline }}"
           - service: input_select.select_option
             data:
               entity_id: "{{ memory }}"
               option: "{{ trigger_ent }}"
           - sequence: !input offline_actions
 
-      # ONLINE
+      # ONLINE FILTER
       - conditions:
           - condition: trigger
             id: "trigger_online"
+          - "{{ new_state in on_states }}"
           - "{{ trigger_ent in current_options }}"
         sequence:
           - variables:
