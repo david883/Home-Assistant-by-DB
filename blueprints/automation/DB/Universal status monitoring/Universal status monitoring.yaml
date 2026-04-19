@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 19.04.2026-4 Autor: D.B.
+    #### Version 19.04.2026-5 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -63,6 +63,7 @@ blueprint:
               value: "on"
     offline_duration:
       name: "Offline Wartezeit (Minuten)"
+      description: "Zeit, bis die Offline-Meldung erfolgt."
       default: 5
       selector:
         number:
@@ -70,6 +71,7 @@ blueprint:
           max: 60
     online_duration:
       name: "Online Wartezeit (Minuten)"
+      description: "Zeit, bis die Online-Meldung erfolgt."
       default: 2
       selector:
         number:
@@ -90,17 +92,14 @@ blueprint:
     offline_actions:
       name: "Aktionen bei Offline"
       description: "Was soll passieren, wenn ein Gerät offline geht?"
-      default: []
       selector:
         action: {}
     online_actions:
       name: "Aktionen bei Online"
       description: "Was soll passieren, wenn ein Gerät wieder online geht?"
-      default: []
       selector:
         action: {}
 
-# TRIGGER: Löst bei jeder Änderung aus (Filterung erfolgt in der Action)
 trigger:
   - platform: state
     entity_id: !input monitored_entities
@@ -159,7 +158,6 @@ action:
       value: "{{ total_count }}"
 
   - choose:
-      # OFFLINE FILTER
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -182,7 +180,6 @@ action:
               option: "{{ trigger_ent }}"
           - sequence: !input offline_actions
 
-      # ONLINE FILTER
       - conditions:
           - condition: trigger
             id: "trigger_online"
