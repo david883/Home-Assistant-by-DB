@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 19.04.2026-3 Autor: D.B.
+    #### Version 19.04.2026-3a Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -13,6 +13,11 @@ blueprint:
     ---
 
     Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als Gedächtnis, reinigt sich bei Geräte-Entfernung selbst und zählt die überwachten Geräte automatisch.
+
+    In den Actions Blöcken können Platzhalter für Nachrichten genutzt werden.
+
+    Beispiel:
+    Das Gerät {{ device }} ist seit 5 Minuten nicht mehr erreichbar, folgende Geräte sind noch offline: {{ list }}
 
   domain: automation
   input:
@@ -99,7 +104,6 @@ blueprint:
       selector:
         action: {}
 
-# TRIGGER: Zwingend erforderlich für Home Assistant
 trigger:
   - trigger: state
     entity_id: !input monitored_entities
@@ -118,7 +122,6 @@ mode: parallel
 max: 50
 
 action:
-  # 1. BEREINIGUNG: Entfernt "Zombie"-Geräte aus dem Dropdown
   - variables:
       memory: !input memory_helper
       monitored: !input monitored_entities
@@ -134,7 +137,6 @@ action:
     data:
       options: "{{ clean_list }}"
 
-  # 2. HAUPTLOGIK
   - variables:
       counter_total: !input counter_helper_total
       off_states: !input offline_states
@@ -158,7 +160,6 @@ action:
       value: "{{ total_count }}"
 
   - choose:
-      # OFFLINE
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -180,7 +181,6 @@ action:
               option: "{{ trigger_ent }}"
           - sequence: !input offline_actions
 
-      # ONLINE
       - conditions:
           - condition: trigger
             id: "trigger_online"
