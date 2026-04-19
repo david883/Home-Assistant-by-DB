@@ -1,19 +1,9 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 19.04.2026-5 Autor: D.B.
+    #### Version 19.04.2026-6 Autor: D.B.
 
-    #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
-
-    ---
-
-    #### Dir gefällt meine Arbeit? Lade mich doch auf einen Kaffee ein!
-    [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
-
-    ---
-
-    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als Gedächtnis, reinigt sich bei Geräte-Entfernung selbst und zählt die überwachten Geräte automatisch.
-
+    Überwacht Entitäten auf Statusänderungen. 
     In den Actions Blöcken können Platzhalter für Nachrichten genutzt werden. 
     Beispiel: Das Gerät {{ device }} ist seit 5 Minuten nicht mehr erreichbar, folgende Geräte sind noch offline: {{ list }}
 
@@ -92,11 +82,13 @@ blueprint:
     offline_actions:
       name: "Aktionen bei Offline"
       description: "Was soll passieren, wenn ein Gerät offline geht?"
+      default: []
       selector:
         action: {}
     online_actions:
       name: "Aktionen bei Online"
       description: "Was soll passieren, wenn ein Gerät wieder online geht?"
+      default: []
       selector:
         action: {}
 
@@ -116,21 +108,23 @@ mode: parallel
 max: 50
 
 action:
-  # 1. BEREINIGUNG
+  # 1. BEREINIGUNG (Jetzt als 'choose', damit die Automatisierung nicht abbricht)
   - variables:
       memory: !input memory_helper
       monitored: !input monitored_entities
       mem_options: "{{ state_attr(memory, 'options') or [] }}"
       clean_list: "{{ mem_options | select('in', monitored + ['Platzhalter']) | list }}"
   
-  - condition: template
-    value_template: "{{ mem_options | count != clean_list | count }}"
-    
-  - service: input_select.set_options
-    target:
-      entity_id: "{{ memory }}"
-    data:
-      options: "{{ clean_list }}"
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ mem_options | count != clean_list | count }}"
+        sequence:
+          - service: input_select.set_options
+            target:
+              entity_id: "{{ memory }}"
+            data:
+              options: "{{ clean_list }}"
 
   # 2. HAUPTLOGIK
   - variables:
@@ -158,6 +152,7 @@ action:
       value: "{{ total_count }}"
 
   - choose:
+      # OFFLINE
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -180,6 +175,7 @@ action:
               option: "{{ trigger_ent }}"
           - sequence: !input offline_actions
 
+      # ONLINE
       - conditions:
           - condition: trigger
             id: "trigger_online"
