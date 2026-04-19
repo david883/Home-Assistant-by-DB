@@ -1,19 +1,184 @@
 blueprint:
-  name: "Universelle Statusüberwachung DB (fixed)"
+  name: "Universelle Statusüberwachung DB (V2 - Auto Cleanup)"
   description: >
-    Version 19.04.2026-4 (fixed) Autor: D.B.
+    #### Version 19.04.2026-2 Autor: D.B.
 
-    Import:
-    https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
-
-    RAW:
-    https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
-
-    Spende:
-    https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN
-
-    ---
-    Platzhalter:
-    {{ device }}, {{ list }}, {{ count }}
+    ### 🆕 Änderungen V2:
+    - Automatische Bereinigung des Offline-Gedächtnisses
+    - Entfernt gelöschte oder nicht mehr überwachte Entitäten
+    - Verhindert „Zombie“-Einträge im Dropdown
+    - Stabilere Zustandslogik
 
   domain: automation
+
+  input:
+    monitored_entities:
+      name: "Zu überwachende Entitäten"
+      selector:
+        entity:
+          multiple: true
+
+    offline_states:
+      name: "Offline Status"
+      default: [unavailable, unknown, not_home, offline, "off"]
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+
+    online_states:
+      name: "Online Status"
+      default: [available, home, online, "on"]
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+
+    offline_duration:
+      name: "Offline Wartezeit (Minuten)"
+      default: 5
+      selector:
+        number:
+          min: 0
+          max: 60
+
+    online_duration:
+      name: "Online Wartezeit (Minuten)"
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 60
+
+    memory_helper:
+      name: "Dropdown Speicher"
+      selector:
+        entity:
+          domain: input_select
+
+    counter_helper_total:
+      name: "Zähler Gesamt"
+      selector:
+        entity:
+          domain: input_number
+
+    offline_actions:
+      name: "Aktionen bei Offline"
+      selector:
+        action: {}
+
+    online_actions:
+      name: "Aktionen bei Online"
+      selector:
+        action: {}
+
+mode: parallel
+max: 50
+
+trigger:
+  - trigger: state
+    entity_id: !input monitored_entities
+    for:
+      minutes: !input offline_duration
+    id: offline
+    to: !input offline_states
+
+  - trigger: state
+    entity_id: !input monitored_entities
+    for:
+      minutes: !input online_duration
+    id: online
+    to: !input online_states
+
+action:
+  - variables:
+      memory: !input memory_helper
+      counter_total: !input counter_helper_total
+      monitored: !input monitored_entities
+      off_states: !input offline_states
+
+      trigger_ent: "{{ trigger.entity_id }}"
+      device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
+
+      current_options: "{{ state_attr(memory, 'options') or [] }}"
+
+      # 🧹 CLEANUP: entferne ungültige Einträge
+      cleaned_options: >
+        {% set valid = [] %}
+        {% for opt in current_options %}
+          {% if opt != 'Platzhalter' and opt in monitored %}
+            {% set valid = valid + [opt] %}
+          {% endif %}
+        {% endfor %}
+        {{ valid + ['Platzhalter'] }}
+
+      total_count: "{{ monitored | count }}"
+
+      list: >
+        {% set names = namespace(items=[]) %}
+        {% for ent in monitored %}
+          {% if ent != trigger_ent and states(ent) in off_states %}
+            {% set names.items = names.items + [state_attr(ent, 'friendly_name') or ent] %}
+          {% endif %}
+        {% endfor %}
+        {{ names.items | join(', ') if names.items | count > 0 else 'keine' }}
+
+  # 🧹 IMMER zuerst bereinigen
+  - service: input_select.set_options
+    data:
+      entity_id: "{{ memory }}"
+      options: "{{ cleaned_options }}"
+
+  - service: input_select.select_option
+    data:
+      entity_id: "{{ memory }}"
+      option: "Platzhalter"
+
+  # Gesamtzahl aktualisieren
+  - service: input_number.set_value
+    data:
+      entity_id: "{{ counter_total }}"
+      value: "{{ total_count }}"
+
+  - choose:
+
+      # 🔴 OFFLINE
+      - conditions:
+          - condition: trigger
+            id: offline
+          - "{{ trigger_ent not in cleaned_options }}"
+        sequence:
+
+          - variables:
+              new_list: "{{ (cleaned_options + [trigger_ent]) | unique | list }}"
+              count: "{{ new_list | reject('eq', 'Platzhalter') | list | count }}"
+
+          - service: input_select.set_options
+            data:
+              entity_id: "{{ memory }}"
+              options: "{{ new_list + ['Platzhalter'] }}"
+
+          - service: input_select.select_option
+            data:
+              entity_id: "{{ memory }}"
+              option: "{{ trigger_ent }}"
+
+          - sequence: !input offline_actions
+
+      # 🟢 ONLINE
+      - conditions:
+          - condition: trigger
+            id: online
+          - "{{ trigger_ent in cleaned_options }}"
+        sequence:
+
+          - variables:
+              new_list: "{{ cleaned_options | reject('eq', trigger_ent) | list }}"
+              count: "{{ new_list | reject('eq', 'Platzhalter') | list | count }}"
+
+          - service: input_select.set_options
+            data:
+              entity_id: "{{ memory }}"
+              options: "{{ new_list + ['Platzhalter'] }}"
+
+          - sequence: !input online_actions
