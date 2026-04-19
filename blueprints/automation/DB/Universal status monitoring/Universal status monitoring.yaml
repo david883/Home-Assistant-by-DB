@@ -1,12 +1,6 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
-  description: >
-    #### Version 19.04.2026-6 Autor: D.B.
-
-    Überwacht Entitäten auf Statusänderungen. 
-    In den Actions Blöcken können Platzhalter für Nachrichten genutzt werden. 
-    Beispiel: Das Gerät {{ device }} ist seit 5 Minuten nicht mehr erreichbar, folgende Geräte sind noch offline: {{ list }}
-
+  description: "Überwacht Entitäten auf Statusänderungen mit automatischer Bereinigung."
   domain: automation
   input:
     monitored_entities:
@@ -82,15 +76,13 @@ blueprint:
     offline_actions:
       name: "Aktionen bei Offline"
       description: "Was soll passieren, wenn ein Gerät offline geht?"
-      default: []
       selector:
-        action: {}
+        action:
     online_actions:
       name: "Aktionen bei Online"
       description: "Was soll passieren, wenn ein Gerät wieder online geht?"
-      default: []
       selector:
-        action: {}
+        action:
 
 trigger:
   - platform: state
@@ -108,7 +100,6 @@ mode: parallel
 max: 50
 
 action:
-  # 1. BEREINIGUNG (Jetzt als 'choose', damit die Automatisierung nicht abbricht)
   - variables:
       memory: !input memory_helper
       monitored: !input monitored_entities
@@ -126,33 +117,22 @@ action:
             data:
               options: "{{ clean_list }}"
 
-  # 2. HAUPTLOGIK
   - variables:
       counter_total: !input counter_helper_total
       off_states: !input offline_states
       on_states: !input online_states
       trigger_ent: "{{ trigger.entity_id }}"
-      device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
       current_options: "{{ state_attr(memory, 'options') or [] }}"
       total_count: "{{ monitored | count }}"
       new_state: "{{ trigger.to_state.state }}"
-      
-      list: >
-        {% set names = namespace(items=[]) %}
-        {% for ent in monitored %}
-          {% if ent != trigger_ent and states(ent) in off_states %}
-            {% set names.items = names.items + [state_attr(ent, 'friendly_name') or ent] %}
-          {% endif %}
-        {% endfor %}
-        {{ names.items | join(', ') if names.items | count > 0 else 'keine' }}
 
   - service: input_number.set_value
-    data:
+    target:
       entity_id: "{{ counter_total }}"
+    data:
       value: "{{ total_count }}"
 
   - choose:
-      # OFFLINE
       - conditions:
           - condition: trigger
             id: "trigger_offline"
@@ -161,21 +141,18 @@ action:
         sequence:
           - variables:
               new_list_offline: "{{ (current_options + [trigger_ent, 'Platzhalter']) | unique | list }}"
-          - service: input_select.select_option
-            data:
-              entity_id: "{{ memory }}"
-              option: "Platzhalter"
           - service: input_select.set_options
-            data:
+            target:
               entity_id: "{{ memory }}"
+            data:
               options: "{{ new_list_offline }}"
           - service: input_select.select_option
-            data:
+            target:
               entity_id: "{{ memory }}"
+            data:
               option: "{{ trigger_ent }}"
           - sequence: !input offline_actions
 
-      # ONLINE
       - conditions:
           - condition: trigger
             id: "trigger_online"
@@ -184,12 +161,9 @@ action:
         sequence:
           - variables:
               new_list_online: "{{ (current_options | reject('eq', trigger_ent) | list + ['Platzhalter']) | unique | list }}"
-          - service: input_select.select_option
-            data:
-              entity_id: "{{ memory }}"
-              option: "Platzhalter"
           - service: input_select.set_options
-            data:
+            target:
               entity_id: "{{ memory }}"
+            data:
               options: "{{ new_list_online }}"
           - sequence: !input online_actions
