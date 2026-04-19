@@ -1,199 +1,22 @@
-blueprint:
-  name: "Universelle Statusüberwachung DB"
-  description: >
-    #### Version 19.04.2026-3a Autor: D.B.
+description: >
+  #### Version 19.04.2026-4 (fixed) Autor: D.B.
 
-    #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
+  #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
-    ---
+  #### 🔗 RAW Datei:
+  https://raw.githubusercontent.com/david883/Home-Assistant-by-DB/refs/heads/main/blueprints/automation/DB/Universal%20status%20monitoring/Universal%20status%20monitoring.yaml
 
-    #### Dir gefällt meine Arbeit? Lade mich doch auf einen Kaffee ein!
-    [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
+  ---
 
-    ---
+  #### ☕ Dir gefällt meine Arbeit? Unterstütze mich:
+  [![PayPal Spende](https://www.paypalobjects.com/de_DE/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=Y5WGESDT8LWRN)
 
-    Überwacht Entitäten auf Statusänderungen. Nutzt eine Auswahlliste (Dropdown) als Gedächtnis, reinigt sich bei Geräte-Entfernung selbst und zählt die überwachten Geräte automatisch.
+  ---
 
-    In den Actions Blöcken können Platzhalter für Nachrichten genutzt werden.
+  Überwacht Entitäten auf Statusänderungen (offline/online).
+  Nutzt ein input_select als Speicher für aktuell offline Geräte.
 
-    Beispiel:
-    Das Gerät {{ device }} ist seit 5 Minuten nicht mehr erreichbar, folgende Geräte sind noch offline: {{ list }}
-
-  domain: automation
-  input:
-    monitored_entities:
-      name: "Zu überwachende Entitäten"
-      description: "Wähle hier alle Geräte aus, die du überwachen möchtest."
-      selector:
-        entity:
-          multiple: true
-    offline_states:
-      name: "Offline Status-Wörter"
-      description: "Welche Zustände sollen als 'Offline' gewertet werden?"
-      default: ["unavailable", "unknown", "not_home", "offline", "off"]
-      selector:
-        select:
-          multiple: true
-          custom_value: true
-          options:
-            - label: "unavailable"
-              value: "unavailable"
-            - label: "unknown"
-              value: "unknown"
-            - label: "offline"
-              value: "offline"
-            - label: "off"
-              value: "off"
-            - label: "not_home"
-              value: "not_home"
-    online_states:
-      name: "Online Status-Wörter"
-      description: "Welche Zustände sollen als 'Online' gewertet werden?"
-      default: ["available", "home", "online", "on"]
-      selector:
-        select:
-          multiple: true
-          custom_value: true
-          options:
-            - label: "available"
-              value: "available"
-            - label: "online"
-              value: "online"
-            - label: "home"
-              value: "home"
-            - label: "on"
-              value: "on"
-    offline_duration:
-      name: "Offline Wartezeit (Minuten)"
-      description: "Wie lange muss ein Gerät offline sein, bevor die Meldung kommt?"
-      default: 5
-      selector:
-        number:
-          min: 0
-          max: 60
-    online_duration:
-      name: "Online Wartezeit (Minuten)"
-      description: "Wie lange muss ein Gerät online sein, bevor es als 'wieder da' gilt?"
-      default: 2
-      selector:
-        number:
-          min: 0
-          max: 60
-    memory_helper:
-      name: "Gedächtnis Helfer (input_select)"
-      description: "Wähle dein Dropdown 'input_select.offline_gedachtnis_status_monitoring_script' aus."
-      selector:
-        entity:
-          domain: input_select
-    counter_helper_total:
-      name: "Zähler: Überwacht Gesamt (input_number)"
-      description: "Wähle den Nummern-Helfer, der die Gesamtzahl der überwachten Geräte anzeigen soll."
-      selector:
-        entity:
-          domain: input_number
-    offline_actions:
-      name: "Aktionen bei Offline"
-      description: "Hier definierst du, was passieren soll, wenn ein Gerät offline geht (z.B. Benachrichtigung senden)."
-      default: []
-      selector:
-        action: {}
-    online_actions:
-      name: "Aktionen bei Online"
-      description: "Hier definierst du, was passieren soll, wenn ein Gerät wieder online ist."
-      default: []
-      selector:
-        action: {}
-
-trigger:
-  - trigger: state
-    entity_id: !input monitored_entities
-    for:
-      minutes: !input offline_duration
-    id: "trigger_offline"
-    to: !input offline_states
-  - trigger: state
-    entity_id: !input monitored_entities
-    for:
-      minutes: !input online_duration
-    id: "trigger_online"
-    to: !input online_states
-
-mode: parallel
-max: 50
-
-action:
-  - variables:
-      memory: !input memory_helper
-      monitored: !input monitored_entities
-      mem_options: "{{ state_attr(memory, 'options') or [] }}"
-      clean_list: "{{ mem_options | select('in', monitored + ['Platzhalter']) | list }}"
-  
-  - condition: template
-    value_template: "{{ mem_options | count != clean_list | count }}"
-    
-  - service: input_select.set_options
-    target:
-      entity_id: "{{ memory }}"
-    data:
-      options: "{{ clean_list }}"
-
-  - variables:
-      counter_total: !input counter_helper_total
-      off_states: !input offline_states
-      trigger_ent: "{{ trigger.entity_id }}"
-      device: "{{ state_attr(trigger_ent, 'friendly_name') or trigger_ent }}"
-      current_options: "{{ state_attr(memory, 'options') or [] }}"
-      total_count: "{{ monitored | count }}"
-      
-      list: >
-        {% set names = namespace(items=[]) %}
-        {% for ent in monitored %}
-          {% if ent != trigger_ent and states(ent) in off_states %}
-            {% set names.items = names.items + [state_attr(ent, 'friendly_name') or ent] %}
-          {% endif %}
-        {% endfor %}
-        {{ names.items | join(', ') if names.items | count > 0 else 'keine' }}
-
-  - service: input_number.set_value
-    data:
-      entity_id: "{{ counter_total }}"
-      value: "{{ total_count }}"
-
-  - choose:
-      - conditions:
-          - condition: trigger
-            id: "trigger_offline"
-          - "{{ trigger_ent not in current_options }}"
-        sequence:
-          - variables:
-              new_list_offline: "{{ (current_options + [trigger_ent, 'Platzhalter']) | unique | list }}"
-          - service: input_select.select_option
-            data:
-              entity_id: "{{ memory }}"
-              option: "Platzhalter"
-          - service: input_select.set_options
-            data:
-              entity_id: "{{ memory }}"
-              options: "{{ new_list_offline }}"
-          - service: input_select.select_option
-            data:
-              entity_id: "{{ memory }}"
-              option: "{{ trigger_ent }}"
-          - sequence: !input offline_actions
-
-      - conditions:
-          - condition: trigger
-            id: "trigger_online"
-          - "{{ trigger_ent in current_options }}"
-        sequence:
-          - variables:
-              new_list_online: "{{ (current_options | reject('eq', trigger_ent) | list + ['Platzhalter']) | unique | list }}"
-          - service: input_select.select_option
-            data:
-              entity_id: "{{ memory }}"
-              option: "Platzhalter"
-          - service: input_select.set_options
-            data:
-              entity_id: "{{ memory }}"
-              options: "{{ new_list_online }}"
-          - sequence: !input online_actions
+  Platzhalter für Actions:
+  - {{ device }} → aktuelles Gerät
+  - {{ list }} → weitere offline Geräte
+  - {{ count }} → Anzahl offline Geräte
