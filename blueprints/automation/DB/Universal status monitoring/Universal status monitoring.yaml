@@ -1,7 +1,7 @@
 blueprint:
   name: "Universelle Statusüberwachung DB"
   description: >
-    #### Version 19.04.2026-5a Autor: D.B.
+    #### Version 19.04.2026-6 Autor: D.B.
 
     #### [![Import Blueprint to HA](https://img.shields.io/badge/Import%20Blueprint-to%20HA-blue?style=for-the-badge&logo=homeassistant)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavid883%2FHome-Assistant-by-DB%2Frefs%2Fheads%2Fmain%2Fblueprints%2Fautomation%2FDB%2FUniversal%2520status%2520monitoring%2FUniversal%2520status%2520monitoring.yaml)
 
@@ -102,6 +102,7 @@ blueprint:
       selector:
         action: {}
 
+# TRIGGER: Absolut restriktiv nur auf die überwachten Entitäten begrenzt!
 trigger:
   - platform: state
     entity_id: !input monitored_entities
@@ -118,7 +119,7 @@ mode: parallel
 max: 50
 
 action:
-  # 1. BEREINIGUNG
+  # 1. BEREINIGUNG: Läuft NUR, wenn die Anzahl im Helfer nicht mit der bereinigten Liste übereinstimmt
   - variables:
       memory: !input memory_helper
       monitored: !input monitored_entities
@@ -136,7 +137,11 @@ action:
             data:
               options: "{{ clean_list }}"
 
-  # 2. HAUPTLOGIK
+  # 2. SCHUTZFILTER: Verhindert, dass leere oder fehlerhafte Trigger durchrutschen
+  - condition: template
+    value_template: "{{ trigger.to_state is not none and trigger.entity_id is defined }}"
+
+  # 3. HAUPTLOGIK
   - variables:
       counter_total: !input counter_helper_total
       off_states: !input offline_states
@@ -156,9 +161,11 @@ action:
         {% endfor %}
         {{ names.items | join(', ') if names.items | count > 0 else 'keine' }}
 
+  # Gesamtzahl setzen
   - service: input_number.set_value
-    data:
+    target:
       entity_id: "{{ counter_total }}"
+    data:
       value: "{{ total_count }}"
 
   - choose:
